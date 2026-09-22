@@ -14,13 +14,12 @@ import { DiscordIcon } from './Field';
 /** Shared class strings; `accent` swaps the teal treatment for medical's red. */
 export const applicationPageClasses = {
   page: 'flex min-h-screen flex-col',
-  main: 'flex flex-1 items-center justify-center px-5 py-10',
+  main: 'flex flex-1 items-center justify-center px-5 py-10 max-[640px]:px-4 max-[640px]:py-5',
 
   card: 'panel animate-[fadeInUp_0.6s_ease] p-10 shadow-[0_20px_60px_rgba(0,0,0,0.3)] max-[640px]:p-6',
   header: 'mb-8 text-center',
   headerIcon: 'mb-4 animate-[heroPulse_2s_infinite] text-[48px] max-[640px]:text-[40px]',
   headerTitle: 'mb-2 text-[28px] font-bold text-accent max-[640px]:text-[24px]',
-  headerTitleDanger: 'mb-2 text-[28px] font-bold text-danger max-[640px]:text-[24px]',
   headerDesc: 'text-sm text-ink-dim',
 
   hint: 'pl-1 text-xs text-ink-dim/50',
@@ -108,7 +107,7 @@ export function DiscordConnectPanel({ auth }: { auth: DiscordAuthState }) {
       </div>
 
       {connected ? (
-        <div className="flex animate-[fadeInUp_0.3s_ease] items-center gap-4 rounded-md border border-success/30 bg-success/10 px-5 py-4">
+        <div className="flex animate-[fadeIn_0.3s_ease] items-center gap-4 rounded-md border border-success/30 bg-success/10 px-5 py-4">
           <img
             src={auth.avatarUrl ?? ''}
             alt=""
@@ -220,7 +219,7 @@ export function EditSection({
   onCancel: () => void;
 }) {
   return (
-    <div className="animate-[fadeInUp_0.3s_ease] rounded-md border border-gold/15 bg-gold/5 p-4">
+    <div className="animate-[fadeIn_0.3s_ease] rounded-md border border-gold/15 bg-gold/5 p-4">
       <div className="flex items-center gap-2.5 rounded-md border border-gold/30 bg-gold/[0.12] px-4 py-3 text-sm font-semibold text-gold">
         <span className="text-lg">✎</span>
         <span>กำลังแก้ไขข้อมูล</span>
@@ -267,18 +266,31 @@ export function EditSection({
   );
 }
 
-export function ErrorBox({ errors }: { errors: string[] }) {
+export function ErrorBox({
+  errors,
+  tone = 'error',
+}: {
+  errors: string[];
+  tone?: 'error' | 'success';
+}) {
   if (errors.length === 0) return null;
+
+  const success = tone === 'success';
 
   return (
     <div
       role="alert"
-      className="flex items-start gap-3 rounded-md border border-danger/30 bg-danger/10 p-4"
+      className={`flex items-start gap-3 rounded-md border p-4 ${
+        success ? 'border-success/30 bg-success/10' : 'border-danger/30 bg-danger/10'
+      }`}
     >
       <span className="shrink-0 text-xl">⚠</span>
       <ul className="space-y-1">
         {errors.map((error, i) => (
-          <li key={i} className="text-sm leading-relaxed text-danger">
+          <li
+            key={i}
+            className={`text-sm leading-relaxed ${success ? 'text-success' : 'text-danger'}`}
+          >
             • {error}
           </li>
         ))}
@@ -311,7 +323,7 @@ export function SubmitBar({
     <button
       type="submit"
       disabled={disabled || pending}
-      className={`mt-2 flex w-full cursor-pointer items-center justify-center gap-2.5 rounded-md bg-gradient-to-br px-6 py-4 text-base font-bold transition hover:-translate-y-0.5 active:translate-y-0 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:translate-y-0 disabled:hover:shadow-none max-[640px]:px-5 max-[640px]:py-3.5 max-[640px]:text-[15px] ${gradient}`}
+      className={`mt-2 flex w-full cursor-pointer items-center justify-center gap-2.5 rounded-md bg-gradient-to-br px-6 py-4 text-base font-bold transition hover:-translate-y-0.5 active:translate-y-0 disabled:cursor-not-allowed disabled:hover:translate-y-0 disabled:hover:shadow-none max-[640px]:px-5 max-[640px]:py-3.5 max-[640px]:text-[15px] ${gradient}`}
     >
       <span className="text-lg">{editMode ? '✎' : '✓'}</span>
       <span>{pending ? 'กำลังส่ง...' : editMode ? 'บันทึกการแก้ไข' : label}</span>
@@ -321,7 +333,7 @@ export function SubmitBar({
 
 export function RequiredDiscordNote({ children }: { children: React.ReactNode }) {
   return (
-    <div className="flex animate-[fadeInUp_0.3s_ease] items-center justify-center gap-2 rounded-md border border-gold/30 bg-gold/10 px-4 py-3 text-[13px] font-medium text-gold">
+    <div className="flex animate-[fadeIn_0.3s_ease] items-center justify-center gap-2 rounded-md border border-gold/30 bg-gold/10 px-4 py-3 text-[13px] font-medium text-gold">
       <span className="text-base">💡</span>
       {children}
     </div>

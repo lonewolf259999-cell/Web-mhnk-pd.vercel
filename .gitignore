@@ -7,12 +7,16 @@ out/
 next-env.d.ts
 .vercel
 
-# Environment variables
+# Secrets — never commit real values. Set them on the host instead
+# (DirectAdmin -> Node.js Selector -> Environment Variables).
+# .env.example may be committed, but only with empty values.
 .env
-.env*.local
-
-# Google Cloud credentials
-credentials.json
+.env.*
+!.env.example
+credentials*.json
+service-account*.json
+*.pem
+*.key
 
 # Logs / runtime artifacts
 *.log
@@ -23,3 +27,13 @@ credentials.json
 
 # Deploy bundle (build output)
 *.zip
+
+# Local tool state (.claude/launch.json is shared on purpose)
+.claude/settings.local.json
+
+# Editor and OS noise
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+desktop.ini
