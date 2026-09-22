@@ -4,7 +4,7 @@
    Elysia server — change a route and these stop compiling. */
 
 import { client, unwrap } from './eden';
-import type { CaseItem, ConductItem, FineItem, RuleItem } from '@/lib/types';
+import type { CaseItem, ConductItem, FineItem, RuleItem, RulesType } from '@/lib/types';
 
 /* /rules-data/:type serves four shapes behind one route, so Eden infers the
    union of all of them. The literal passed in determines which arm comes
@@ -83,4 +83,15 @@ export const mutations = {
 
   moveOut: (row: number, pin: string, reason: string) =>
     unwrap(client.api.roster['move-out']({ row }).post({ pin, reason })),
+
+  /* ---- conduct/rules/fines admin CRUD ---- */
+
+  addRuleItem: (type: RulesType, pin: string, data: Record<string, string>) =>
+    unwrap(client.api['rules-data']({ type }).post({ pin, ...data })),
+
+  updateRuleItem: (type: RulesType, id: string, pin: string, data: Record<string, string>) =>
+    unwrap(client.api['rules-data']({ type })({ id }).put({ pin, ...data })),
+
+  deleteRuleItem: (type: RulesType, id: string, pin: string) =>
+    unwrap(client.api['rules-data']({ type })({ id }).delete({ pin })),
 };

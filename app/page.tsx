@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { SiteFooter, SiteHeader } from '@/components/SiteHeader';
 import { NavTabs, type PageId } from '@/components/NavTabs';
 import { SearchBar } from '@/components/SearchBar';
@@ -11,13 +11,19 @@ import { FinesView } from '@/components/views/FinesView';
 import { CasesView } from '@/components/views/CasesView';
 import { ScheduleView } from '@/components/views/ScheduleView';
 import { ErrorState, Loading } from '@/components/ui/States';
+import { PinModal } from '@/components/ui/Modal';
 import { useApi } from '@/lib/client/api';
 import { queries } from '@/lib/client/queries';
 import { filterByQuery } from '@/lib/format';
+import { clearPin, isAdminMode, savePin } from '@/lib/client/adminPin';
 
 export default function HomePage() {
   const [page, setPage] = useState<PageId>('roster');
   const [query, setQuery] = useState('');
+
+  const [adminMode, setAdminMode] = useState(false);
+  const [pinPrompt, setPinPrompt] = useState(false);
+  useEffect(() => setAdminMode(isAdminMode()), []);
 
   /* Each tab's data is a separate Google Sheets round trip, so a tab is
      fetched the first time it is opened and kept from then on — switching
@@ -57,7 +63,27 @@ export default function HomePage() {
             resultCount={filteredOfficers.length}
             totalCount={allOfficers.length}
           />
-          <NavTabs active={page} onChange={openPage} />
+          <div className="flex items-center gap-2">
+            <NavTabs active={page} onChange={openPage} />
+            <button
+              type="button"
+              onClick={() => {
+                if (adminMode) {
+                  clearPin();
+                  setAdminMode(false);
+                } else {
+                  setPinPrompt(true);
+                }
+              }}
+              className={`cursor-pointer rounded-md border px-2.5 py-1 text-[0.65rem] font-bold whitespace-nowrap transition ${
+                adminMode
+                  ? 'border-[#f77f07] bg-[#f77f07] text-white'
+                  : 'border-[#f77f07]/30 bg-[#f77f07]/10 text-[#f77f07] hover:bg-[#f77f07]/20'
+              }`}
+            >
+              ♛ Admin
+            </button>
+          </div>
         </div>
       </SiteHeader>
 
@@ -97,6 +123,9 @@ export default function HomePage() {
               icon="📚"
               title="ข้อปฏิบัติเจ้าหน้าที่"
               emptyTitle="ไม่พบข้อปฏิบัติที่ค้นหา"
+              type="conduct"
+              adminMode={adminMode}
+              onDataChanged={conduct.reload}
             />
           )}
 
@@ -111,6 +140,9 @@ export default function HomePage() {
               icon="📖"
               title="กฎหมายและระเบียบตำรวจ"
               emptyTitle="ไม่พบกฎที่ค้นหา"
+              type="rules"
+              adminMode={adminMode}
+              onDataChanged={rules.reload}
             />
           )}
 
@@ -121,6 +153,8 @@ export default function HomePage() {
               error={fines.error}
               query={query}
               onRetry={fines.reload}
+              adminMode={adminMode}
+              onDataChanged={fines.reload}
             />
           )}
 
@@ -138,6 +172,18 @@ export default function HomePage() {
       </div>
 
       <SiteFooter />
+
+      {pinPrompt && (
+        <PinModal
+          title="กรุณาระบุรหัสผ่านเพื่อเข้าโหมดผู้ดูแล"
+          onCancel={() => setPinPrompt(false)}
+          onSubmit={(pin) => {
+            savePin(pin);
+            setPinPrompt(false);
+            setAdminMode(true);
+          }}
+        />
+      )}
     </div>
   );
 }

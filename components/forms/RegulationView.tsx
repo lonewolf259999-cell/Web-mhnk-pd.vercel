@@ -53,6 +53,9 @@ export function RegulationView() {
           icon="📚"
           title="ข้อปฏิบัติเจ้าหน้าที่"
           emptyTitle="ไม่พบข้อปฏิบัติที่ค้นหา"
+          type="conduct"
+          adminMode={false}
+          onDataChanged={conduct.reload}
         />
       </main>
 
