@@ -82,7 +82,7 @@ The GViz export is CDN-cached, so re-reading a week immediately after marking it
 
 `SHEET_ID`, `CASES_SHEET_ID`, `RULES_SHEET_ID` and `ADMIN_PIN` are lazy getters in `server/config.ts` that throw when unset. A missing variable surfaces as a 500 naming the variable on the first request that needs it, not as a boot failure — so the site renders and only the affected endpoints fail. See `.env.example` for the full variable list.
 
-`GOOGLE_JSON_KEY` holds the entire service-account JSON as a single-line string; there is no `credentials.json` fallback.
+`GOOGLE_JSON_KEY` holds the entire service-account JSON as a single-line string. A panel that writes environment variables into `.htaccess` as `SetEnv` truncates a value that long at its first space, which surfaces as `GOOGLE_JSON_KEY is not valid JSON` — there, leave it unset and point `GOOGLE_APPLICATION_CREDENTIALS` at the JSON file instead, keeping that file outside the web-served directory.
 
 **Discord OAuth requires three things to agree exactly**: `APP_URL`, the host actually serving the site, and the redirect registered in the Discord Developer Portal. A mismatch — including `www` vs apex — makes Discord refuse to return from login, with no useful error. `redirectUri()` strips trailing slashes from `APP_URL` for this reason.
 
