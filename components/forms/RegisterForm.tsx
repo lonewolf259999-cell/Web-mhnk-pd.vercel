@@ -1,33 +1,24 @@
 'use client';
 
+/* eslint-disable @next/next/no-img-element */
+
 import { useState } from 'react';
-import Link from 'next/link';
 import { mutations } from '@/lib/client/queries';
 import { useDiscordAuth } from '@/lib/client/useDiscordAuth';
-import { CopyButton } from '@/components/ui/Modal';
 import { useToast } from '@/components/ui/Toast';
-import { SiteHeader } from '@/components/SiteHeader';
-import { DiscordConnect, ErrorList, Field, SubmitButton, TextInput } from './Field';
-
-/** Full-height, vertically-centered page shell matching the v2 register/medical layout. */
-function PageShell({ children }: { children: React.ReactNode }) {
-  return (
-    <div className="flex min-h-screen flex-col">
-      <SiteHeader />
-      <main className="flex flex-1 items-center justify-center px-4 py-10">
-        <div className="w-full max-w-[600px]">
-          <Link
-            href="/"
-            className="mb-3 inline-flex items-center gap-1.5 text-xs font-semibold text-ink-dim transition hover:text-accent"
-          >
-            ← กลับหน้าหลัก
-          </Link>
-          {children}
-        </div>
-      </main>
-    </div>
-  );
-}
+import { SiteFooter, SiteHeader } from '@/components/SiteHeader';
+import {
+  DiscordConnectPanel,
+  DiscordIdField,
+  EditSection,
+  EditToggle,
+  ErrorBox,
+  Field,
+  FormInput,
+  RequiredDiscordNote,
+  SubmitBar,
+  applicationPageClasses,
+} from './ApplicationForm';
 
 interface FormState {
   ocName: string;
@@ -60,6 +51,7 @@ export function RegisterForm() {
   const [messageId, setMessageId] = useState('');
   const [editCount, setEditCount] = useState(0);
   const [fetching, setFetching] = useState(false);
+  const [copied, setCopied] = useState(false);
 
   const set = (key: keyof FormState) => (e: React.ChangeEvent<HTMLInputElement>) =>
     setForm((prev) => ({ ...prev, [key]: e.target.value }));
@@ -115,7 +107,11 @@ export function RegisterForm() {
 
     try {
       if (editMode) {
-        const result = await mutations.editRegister({ ...payload, messageId: messageId.trim(), editCount });
+        const result = await mutations.editRegister({
+          ...payload,
+          messageId: messageId.trim(),
+          editCount,
+        });
         setEditCount(result.editCount);
         toast(result.message, 'success');
       } else {
@@ -129,166 +125,201 @@ export function RegisterForm() {
     }
   }
 
+  async function copyMessageId() {
+    if (!savedMessageId) return;
+    try {
+      await navigator.clipboard.writeText(savedMessageId);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch {
+      /* clipboard blocked */
+    }
+  }
+
+  const c = applicationPageClasses;
+
   if (savedMessageId) {
     return (
-      <PageShell>
-        <div className="panel animate-[fadeInUp_0.6s_ease] space-y-4 p-10 text-center shadow-[0_20px_60px_rgba(0,0,0,0.3)]">
-          <div className="text-4xl">✅</div>
-          <h2 className="text-lg font-bold text-success">สมัครสำเร็จ!</h2>
-          <p className="text-sm text-ink-dim">ข้อมูลถูกส่งไปยังทีมงานแล้ว</p>
+      <div className={c.page}>
+        <SiteHeader />
+        <main className={c.main}>
+          <div className="w-full max-w-[600px]">
+            <div className={c.successCard}>
+              <div className={c.successIcon}>✔</div>
+              <h2 className={c.successTitle}>สมัครสำเร็จ!</h2>
+              <p className={c.successText}>ข้อมูลการสมัครของคุณถูกส่งไปยังทีมงานเรียบร้อยแล้ว</p>
+              <p className={c.successNote}>ทีมงานจะติดต่อกลับผ่าน Discord ของคุณ</p>
 
-          <div className="rounded-md border border-accent/20 bg-accent/5 p-3 text-left">
-            <p className="mb-2 text-xs text-ink-dim">Message ID (เก็บไว้สำหรับแก้ไขภายหลัง)</p>
-            <div className="flex items-center gap-2">
-              <code className="min-w-0 flex-1 truncate rounded bg-black/30 px-2 py-1.5 text-xs text-accent">
-                {savedMessageId}
-              </code>
-              <CopyButton value={savedMessageId} label="คัดลอก Message ID" />
+              <div className={c.copySection}>
+                <label className={c.copyLabel}>Message ID (เก็บไว้สำหรับแก้ไขภายหลัง)</label>
+                <div className="flex gap-2">
+                  <input readOnly value={savedMessageId} className={c.copyInput} />
+                  <button type="button" onClick={copyMessageId} className={c.copyButton}>
+                    {copied ? '✓ คัดลอกแล้ว' : '📋 คัดลอก'}
+                  </button>
+                </div>
+                <p className={c.copyHint}>
+                  💡 คัดลอก ID นี้ไว้ก่อนปิดหน้าเว็บ ถ้าต้องการแก้ไขข้อมูลครั้งต่อไป
+                </p>
+              </div>
+
+              <div className="flex flex-wrap justify-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSavedMessageId(null);
+                    setForm(EMPTY);
+                    setEditMode(false);
+                    setMessageId('');
+                  }}
+                  className={c.resetButton}
+                >
+                  <span className="text-lg">🔄</span> สมัครใหม่
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMessageId(savedMessageId);
+                    setEditMode(true);
+                    setSavedMessageId(null);
+                  }}
+                  className={c.editAfterSuccessButton}
+                >
+                  ✎ แก้ไขข้อมูลนี้
+                </button>
+              </div>
             </div>
           </div>
-
-          <div className="flex gap-2">
-            <button
-              type="button"
-              onClick={() => {
-                setSavedMessageId(null);
-                setForm(EMPTY);
-              }}
-              className="flex-1 cursor-pointer rounded-sm bg-white/10 py-2.5 text-sm font-semibold text-ink-dim transition hover:bg-white/15"
-            >
-              สมัครใหม่
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setMessageId(savedMessageId);
-                setEditMode(true);
-                setSavedMessageId(null);
-              }}
-              className="flex-1 cursor-pointer rounded-sm bg-accent py-2.5 text-sm font-semibold text-night transition hover:bg-accent-dark"
-            >
-              แก้ไขข้อมูล
-            </button>
-          </div>
-        </div>
-      </PageShell>
+        </main>
+        <SiteFooter />
+      </div>
     );
   }
 
   return (
-    <PageShell>
-      <div className="panel animate-[fadeInUp_0.6s_ease] p-10 shadow-[0_20px_60px_rgba(0,0,0,0.3)]">
-        <div className="mb-8 text-center">
-          <div className="mb-4 animate-[heroPulse_2s_infinite] text-5xl">⚖</div>
-          <h2 className="mb-2 text-2xl font-bold text-accent">สมัครเป็นตำรวจ</h2>
-          <p className="text-sm text-ink-dim">กรอกข้อมูลด้านล่างเพื่อสมัครเข้าร่วมกรมตำรวจ MHNK</p>
-        </div>
+    <div className={c.page}>
+      <SiteHeader />
 
-        <form onSubmit={submit} className="space-y-4">
-        <DiscordConnect auth={auth} />
-
-        {auth.failed && <ErrorList errors={['เชื่อมต่อ Discord ล้มเหลว กรุณาลองใหม่อีกครั้ง']} />}
-
-        <div className="flex items-center justify-between gap-2 border-y border-white/5 py-2.5">
-          <span className="text-xs text-ink-dim">
-            {editMode ? 'กำลังแก้ไขใบสมัครเดิม' : 'สมัครใหม่'}
-          </span>
-          <button
-            type="button"
-            onClick={() => {
-              setEditMode((v) => !v);
-              setErrors([]);
-            }}
-            className="cursor-pointer rounded border border-accent/30 px-2.5 py-1 text-xs font-semibold text-accent transition hover:bg-accent/10"
-          >
-            {editMode ? 'ยกเลิกการแก้ไข' : '✏️ แก้ไขใบสมัคร'}
-          </button>
-        </div>
-
-        {editMode && (
-          <Field
-            label="Message ID"
-            hint="เปิด Discord → คลิกขวาที่ embed → Copy Message ID แล้วนำมาวาง"
-          >
-            <div className="flex gap-2">
-              <TextInput
-                value={messageId}
-                onChange={(e) => setMessageId(e.target.value)}
-                placeholder="วาง Message ID ที่คัดลอกจาก Discord"
-              />
-              <button
-                type="button"
-                onClick={loadExisting}
-                disabled={fetching}
-                className="shrink-0 cursor-pointer rounded-sm border border-accent/30 bg-accent/10 px-3 text-xs font-semibold text-accent transition hover:bg-accent/20 disabled:opacity-50"
-              >
-                {fetching ? '...' : 'โหลด'}
-              </button>
+      <main className={c.main}>
+        <div className="w-full max-w-[600px]">
+          <div className={c.card}>
+            <div className={c.header}>
+              <div className={c.headerIcon}>⚖</div>
+              <h2 className={c.headerTitle}>สมัครเป็นตำรวจ</h2>
+              <p className={c.headerDesc}>กรอกข้อมูลด้านล่างเพื่อสมัครเข้าร่วมกรมตำรวจ MHNK</p>
             </div>
-          </Field>
-        )}
 
-        <Field label="ชื่อเล่น IC" required>
-          <TextInput value={form.ocName} onChange={set('ocName')} maxLength={50} required />
-        </Field>
+            <DiscordConnectPanel auth={auth} />
 
-        <Field label="ชื่อ IC / ชื่อตามบัตรประชาชน" required>
-          <div className="grid grid-cols-2 gap-2">
-            <TextInput
-              value={form.icFirstName}
-              onChange={set('icFirstName')}
-              placeholder="First Name"
-              maxLength={50}
-              required
-            />
-            <TextInput
-              value={form.icLastName}
-              onChange={set('icLastName')}
-              placeholder="Last Name"
-              maxLength={50}
-              required
-            />
+            {auth.failed && <ErrorBox errors={['เชื่อมต่อ Discord ล้มเหลว กรุณาลองใหม่อีกครั้ง']} />}
+
+            <form onSubmit={submit} className="flex flex-col gap-6">
+              <DiscordIdField userId={auth.user?.userId ?? ''} />
+
+              <EditToggle
+                editMode={editMode}
+                onToggle={() => {
+                  setEditMode((v) => !v);
+                  setErrors([]);
+                }}
+              />
+
+              {editMode && (
+                <EditSection
+                  messageId={messageId}
+                  onMessageIdChange={setMessageId}
+                  onFetch={loadExisting}
+                  fetching={fetching}
+                  onCancel={() => {
+                    setEditMode(false);
+                    setErrors([]);
+                  }}
+                />
+              )}
+
+              <Field icon="👤" label="ชื่อ เล่น IC" hint="ชื่อที่ให้เพื่อนเรียก">
+                <FormInput
+                  value={form.ocName}
+                  onChange={set('ocName')}
+                  placeholder="กรอกชื่อเล่น"
+                  maxLength={50}
+                  required
+                />
+              </Field>
+
+              <Field icon="📋" label="ชื่อ IC / ชื่อตามบัตรประชาชน">
+                <div className="flex flex-col gap-3 min-[481px]:flex-row min-[481px]:gap-3">
+                  <div className="flex min-w-0 flex-1 flex-col gap-2">
+                    <FormInput
+                      value={form.icFirstName}
+                      onChange={set('icFirstName')}
+                      placeholder="First Name"
+                      maxLength={50}
+                      required
+                    />
+                    <span className={c.hintSmall}>ชื่อจริง (ห้ามเว้นวรรค)</span>
+                  </div>
+                  <div className="flex min-w-0 flex-1 flex-col gap-2">
+                    <FormInput
+                      value={form.icLastName}
+                      onChange={set('icLastName')}
+                      placeholder="Last Name"
+                      maxLength={50}
+                      required
+                    />
+                    <span className={c.hintSmall}>นามสกุล (ห้ามเว้นวรรค)</span>
+                  </div>
+                </div>
+              </Field>
+
+              <Field icon="🎂" label="อายุ OC" hint="อายุของตัวละครในเกม">
+                <FormInput
+                  type="number"
+                  value={form.ocAge}
+                  onChange={set('ocAge')}
+                  placeholder="กรอกอายุตัวละคร"
+                  min={1}
+                  max={120}
+                  required
+                />
+              </Field>
+
+              <Field icon="📞" label="เบอร์ IC" hint="เบอร์โทรศัพท์ในเกม">
+                <FormInput
+                  value={form.icPhone}
+                  onChange={set('icPhone')}
+                  placeholder="เช่น 123-456-7890"
+                  maxLength={20}
+                  required
+                />
+              </Field>
+
+              <Field icon="🎮" label="ลิงก์ Steam" hint="ลิงก์โปรไฟล์ Steam ของคุณ">
+                <FormInput
+                  type="url"
+                  value={form.steamUrl}
+                  onChange={set('steamUrl')}
+                  placeholder="https://steamcommunity.com/id/yourname"
+                  required
+                />
+              </Field>
+
+              <ErrorBox errors={errors} />
+
+              <SubmitBar
+                editMode={editMode}
+                pending={pending}
+                disabled={!auth.user}
+                label="สมัครสมาชิก"
+              />
+
+              {!auth.user && <RequiredDiscordNote>กรุณาเชื่อมต่อ Discord ก่อนสมัคร</RequiredDiscordNote>}
+            </form>
           </div>
-        </Field>
+        </div>
+      </main>
 
-        <Field label="อายุ OC" required>
-          <TextInput
-            type="number"
-            value={form.ocAge}
-            onChange={set('ocAge')}
-            min={1}
-            max={120}
-            required
-          />
-        </Field>
-
-        <Field label="เบอร์ IC" required>
-          <TextInput
-            value={form.icPhone}
-            onChange={set('icPhone')}
-            placeholder="เช่น 123-456-7890"
-            maxLength={20}
-            required
-          />
-        </Field>
-
-        <Field label="ลิงก์ Steam" required>
-          <TextInput
-            type="url"
-            value={form.steamUrl}
-            onChange={set('steamUrl')}
-            placeholder="https://steamcommunity.com/id/yourname"
-            required
-          />
-        </Field>
-
-        <ErrorList errors={errors} />
-
-        <SubmitButton disabled={!auth.user} pending={pending}>
-          {editMode ? 'บันทึกการแก้ไข' : 'ส่งใบสมัคร'}
-        </SubmitButton>
-        </form>
-      </div>
-    </PageShell>
+      <SiteFooter />
+    </div>
   );
 }
