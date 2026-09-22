@@ -29,9 +29,9 @@ export function NavTabs({
             onClick={() => onChange(page.id)}
             aria-current={isActive ? 'page' : undefined}
             className={[
-              'flex cursor-pointer items-center gap-1.5 rounded-sm border px-3 py-2 text-xs font-semibold whitespace-nowrap transition',
+              'flex cursor-pointer items-center gap-1.5 rounded-[10px] border px-3 py-2 text-xs font-semibold whitespace-nowrap transition',
               isActive
-                ? 'border-accent/40 bg-accent/15 text-accent'
+                ? 'border-accent/40 bg-accent/10 text-accent shadow-[0_0_16px_rgba(29,201,183,0.06)]'
                 : 'border-white/5 bg-white/[0.02] text-ink-dim hover:border-accent/20 hover:text-ink',
             ].join(' ')}
           >

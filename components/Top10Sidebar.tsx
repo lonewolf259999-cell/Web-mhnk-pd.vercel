@@ -21,7 +21,7 @@ function Panel({
   children: React.ReactNode;
 }) {
   return (
-    <aside className="panel w-full shrink-0 p-3 lg:w-[300px] xl:w-[340px]">
+    <aside className="panel w-full shrink-0 p-3 lg:w-[340px]">
       <div className="mb-3 flex items-center justify-between gap-2 border-b border-accent/12 pb-2">
         <h3 className="text-sm font-bold text-ink">{title}</h3>
         <span className="rounded border border-accent/20 bg-accent/10 px-1.5 py-0.5 text-[0.6rem] font-bold text-accent">

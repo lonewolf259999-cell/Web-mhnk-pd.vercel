@@ -52,7 +52,7 @@ export function PinModal({
         }}
       >
         <div className="mb-4 flex items-center justify-between gap-3">
-          <h3 className="text-base font-bold text-accent">🔐 {title}</h3>
+          <h3 className="text-base font-bold text-[#f77f07]">🔐 {title}</h3>
           <button
             type="button"
             onClick={onCancel}
@@ -70,7 +70,7 @@ export function PinModal({
           onChange={(e) => setPin(e.target.value)}
           placeholder="PIN"
           autoComplete="off"
-          className="mb-4 w-full rounded-sm border border-accent/20 bg-black/30 px-3 py-2.5 text-center text-lg tracking-widest text-ink outline-none focus:border-accent/50"
+          className="mb-4 w-full rounded-sm border border-[#f77f07]/20 bg-black/30 px-3 py-2.5 text-center text-lg tracking-widest text-ink outline-none focus:border-[#f77f07]/50"
         />
 
         <div className="flex gap-2.5">
@@ -84,7 +84,7 @@ export function PinModal({
           <button
             type="submit"
             disabled={!pin}
-            className="flex-1 cursor-pointer rounded-sm bg-accent py-2.5 text-sm font-semibold text-night transition hover:bg-accent-dark disabled:cursor-not-allowed disabled:opacity-40"
+            className="flex-1 cursor-pointer rounded-sm bg-[#f77f07] py-2.5 text-sm font-semibold text-night transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-40"
           >
             ยืนยัน
           </button>

@@ -328,7 +328,7 @@ export function ProfileClient() {
   return (
     <div className="flex min-h-screen flex-col">
       <header className="relative z-10 border-b border-accent/12 bg-gradient-to-b from-[rgba(15,23,42,0.98)] to-[rgba(10,15,30,0.95)] px-4 py-3 md:px-6">
-        <div className="mx-auto flex max-w-5xl items-center justify-between gap-3">
+        <div className="mx-auto flex max-w-[800px] items-center justify-between gap-3">
           <Link
             href="/"
             className="flex items-center gap-2 rounded-sm px-2 py-1.5 text-sm font-semibold text-ink-dim transition hover:bg-accent/10 hover:text-accent"
@@ -364,7 +364,7 @@ export function ProfileClient() {
         </div>
       </header>
 
-      <main className="mx-auto w-full max-w-5xl flex-1 space-y-5 px-4 py-6">
+      <main className="mx-auto w-full max-w-[800px] flex-1 space-y-5 px-4 py-6">
         <section className="panel space-y-4 p-5 text-center">
           <div>
             <h2 className="text-xl font-extrabold text-ink">{officer.name}</h2>

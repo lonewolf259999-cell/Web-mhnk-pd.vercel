@@ -1,18 +1,33 @@
 'use client';
 
 import { useState } from 'react';
+import Link from 'next/link';
 import { mutations } from '@/lib/client/queries';
 import { useDiscordAuth } from '@/lib/client/useDiscordAuth';
 import { CopyButton } from '@/components/ui/Modal';
 import { useToast } from '@/components/ui/Toast';
-import {
-  DiscordConnect,
-  ErrorList,
-  Field,
-  FormShell,
-  SubmitButton,
-  TextInput,
-} from './Field';
+import { SiteHeader } from '@/components/SiteHeader';
+import { DiscordConnect, ErrorList, Field, SubmitButton, TextInput } from './Field';
+
+/** Full-height, vertically-centered page shell matching the v2 register/medical layout. */
+function PageShell({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="flex min-h-screen flex-col">
+      <SiteHeader />
+      <main className="flex flex-1 items-center justify-center px-4 py-10">
+        <div className="w-full max-w-[600px]">
+          <Link
+            href="/"
+            className="mb-3 inline-flex items-center gap-1.5 text-xs font-semibold text-ink-dim transition hover:text-accent"
+          >
+            ← กลับหน้าหลัก
+          </Link>
+          {children}
+        </div>
+      </main>
+    </div>
+  );
+}
 
 interface FormState {
   ocName: string;
@@ -116,8 +131,8 @@ export function RegisterForm() {
 
   if (savedMessageId) {
     return (
-      <FormShell title="สมัครเป็นตำรวจ" subtitle="MHNK Police Department">
-        <div className="panel space-y-4 p-6 text-center">
+      <PageShell>
+        <div className="panel animate-[fadeInUp_0.6s_ease] space-y-4 p-10 text-center shadow-[0_20px_60px_rgba(0,0,0,0.3)]">
           <div className="text-4xl">✅</div>
           <h2 className="text-lg font-bold text-success">สมัครสำเร็จ!</h2>
           <p className="text-sm text-ink-dim">ข้อมูลถูกส่งไปยังทีมงานแล้ว</p>
@@ -156,13 +171,20 @@ export function RegisterForm() {
             </button>
           </div>
         </div>
-      </FormShell>
+      </PageShell>
     );
   }
 
   return (
-    <FormShell title="สมัครเป็นตำรวจ" subtitle="MHNK Police Department">
-      <form onSubmit={submit} className="panel space-y-4 p-5">
+    <PageShell>
+      <div className="panel animate-[fadeInUp_0.6s_ease] p-10 shadow-[0_20px_60px_rgba(0,0,0,0.3)]">
+        <div className="mb-8 text-center">
+          <div className="mb-4 animate-[heroPulse_2s_infinite] text-5xl">⚖</div>
+          <h2 className="mb-2 text-2xl font-bold text-accent">สมัครเป็นตำรวจ</h2>
+          <p className="text-sm text-ink-dim">กรอกข้อมูลด้านล่างเพื่อสมัครเข้าร่วมกรมตำรวจ MHNK</p>
+        </div>
+
+        <form onSubmit={submit} className="space-y-4">
         <DiscordConnect auth={auth} />
 
         {auth.failed && <ErrorList errors={['เชื่อมต่อ Discord ล้มเหลว กรุณาลองใหม่อีกครั้ง']} />}
@@ -265,7 +287,8 @@ export function RegisterForm() {
         <SubmitButton disabled={!auth.user} pending={pending}>
           {editMode ? 'บันทึกการแก้ไข' : 'ส่งใบสมัคร'}
         </SubmitButton>
-      </form>
-    </FormShell>
+        </form>
+      </div>
+    </PageShell>
   );
 }

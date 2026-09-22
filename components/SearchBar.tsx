@@ -24,7 +24,7 @@ export function SearchBar({
           placeholder="ค้นหา..."
           autoComplete="off"
           aria-label="ค้นหาเจ้าหน้าที่"
-          className="w-full rounded-sm border border-accent/12 bg-panel/60 py-2.5 pr-9 pl-9 text-sm text-ink outline-none transition placeholder:text-ink-dim/60 focus:border-accent/40"
+          className="w-full rounded-[14px] border border-accent/12 bg-panel/60 py-2.5 pr-9 pl-9 text-sm text-ink outline-none transition placeholder:text-ink-dim/60 focus:border-accent/40 focus:shadow-[0_0_20px_var(--accent-glow),0_0_0_1px_rgba(29,201,183,0.12)]"
         />
         {value && (
           <button

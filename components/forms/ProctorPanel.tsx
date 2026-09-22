@@ -5,7 +5,7 @@ import { mutations } from '@/lib/client/queries';
 import { useDiscordAuth } from '@/lib/client/useDiscordAuth';
 import { readPin, savePin } from '@/lib/client/adminPin';
 import { useToast } from '@/components/ui/Toast';
-import { DiscordConnect, ErrorList, FormShell, TextInput } from './Field';
+import { DiscordConnect, ErrorList } from './Field';
 
 /* Column headers come from the Pending sheet, so they are Thai strings. */
 const COL = {
@@ -25,11 +25,21 @@ const REJECTED = 'ปฏิเสธ';
 
 type Row = Record<string, string | number> & { _row: number };
 
+/* v2's proctor.html/rostermanage.html are standalone admin tools with their
+   own navy/gold palette and Segoe UI font, deliberately separate from the
+   main app's teal theme — a visual signal that you're in a privileged tool,
+   not the public site. Colors below are hardcoded to match that page exactly
+   (they're one-off hex values in v2 too, not design tokens). */
+const ADMIN_FONT = { fontFamily: "'Segoe UI', Tahoma, sans-serif" };
+
 const STATUS_STYLE: Record<string, string> = {
-  [PENDING]: 'border-gold/40 bg-gold/10 text-gold',
-  [APPROVED]: 'border-success/40 bg-success/10 text-success',
-  [REJECTED]: 'border-danger/40 bg-danger/10 text-danger',
+  [PENDING]: 'bg-[#f59e0b33] text-[#f59e0b]',
+  [APPROVED]: 'bg-[#22c55e33] text-[#22c55e]',
+  [REJECTED]: 'bg-[#ef444433] text-[#ef4444]',
 };
+
+const inputClass =
+  'w-full rounded-lg border border-[#3a3a5a] bg-[#252545] px-4 py-3 text-[15px] text-white outline-none focus:border-[#f0c040] disabled:opacity-35';
 
 export function ProctorPanel() {
   const auth = useDiscordAuth('admin');
@@ -114,177 +124,207 @@ export function ProctorPanel() {
 
   if (!authed) {
     return (
-      <FormShell title="⚙️ Admin Panel" subtitle="ตรวจใบสมัคร">
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            void load(pin);
-          }}
-          className="panel space-y-4 p-5"
-        >
-          <DiscordConnect auth={auth} />
+      <div className="min-h-screen bg-[#0f0f1a] text-[#e0e0e0]" style={ADMIN_FONT}>
+        <div className="mx-auto max-w-[420px] px-4 py-10">
+          <h1 className="mb-2.5 text-center text-[28px] font-bold text-[#f0c040]">
+            ⚙️ Admin Panel
+          </h1>
+          <p className="mb-8 text-center text-[#888]">ตรวจใบสมัคร</p>
 
-          <TextInput
-            type="password"
-            value={pin}
-            onChange={(e) => setPin(e.target.value)}
-            placeholder="Admin PIN"
-            disabled={!auth.user}
-          />
-
-          <ErrorList errors={errors} />
-
-          <button
-            type="submit"
-            disabled={!auth.user || !pin || busy}
-            className="w-full cursor-pointer rounded-sm bg-accent py-3 text-sm font-bold text-night transition hover:bg-accent-dark disabled:cursor-not-allowed disabled:opacity-40"
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              void load(pin);
+            }}
+            className="rounded-xl border border-[#2a2a4a] bg-[#1a1a2e] p-6"
           >
-            {busy ? 'กำลังเข้าสู่ระบบ...' : 'เข้าสู่ระบบ'}
-          </button>
-        </form>
-      </FormShell>
+            <div className="mb-4">
+              <DiscordConnect auth={auth} />
+            </div>
+
+            <input
+              type="password"
+              value={pin}
+              onChange={(e) => setPin(e.target.value)}
+              placeholder="Admin PIN"
+              disabled={!auth.user}
+              className={`${inputClass} mb-4`}
+            />
+
+            <ErrorList errors={errors} />
+
+            <button
+              type="submit"
+              disabled={!auth.user || !pin || busy}
+              className="mt-2 w-full cursor-pointer rounded-lg bg-[#f0c040] py-3 text-[15px] font-semibold text-[#1a1a2e] transition hover:opacity-85 disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              {busy ? 'กำลังเข้าสู่ระบบ...' : 'เข้าสู่ระบบ'}
+            </button>
+          </form>
+        </div>
+      </div>
     );
   }
 
   return (
-    <div className="mx-auto w-full max-w-6xl px-4 py-6">
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-lg font-bold text-ink">⚙️ Admin Panel</h1>
-        <button
-          type="button"
-          onClick={() => void load(readPin() ?? pin)}
-          disabled={busy}
-          className="cursor-pointer rounded-sm border border-accent/30 bg-accent/10 px-3 py-1.5 text-xs font-semibold text-accent transition hover:bg-accent/20 disabled:opacity-50"
-        >
-          🔄 โหลดใหม่
-        </button>
-      </div>
+    <div className="min-h-screen bg-[#0f0f1a] text-[#e0e0e0]" style={ADMIN_FONT}>
+      <div className="mx-auto max-w-[1200px] px-5 py-5">
+        <h1 className="mb-2.5 text-center text-[28px] font-bold text-[#f0c040]">
+          ⚙️ Admin Panel
+        </h1>
+        <p className="mb-6 text-center text-[#888]">ตรวจใบสมัคร</p>
 
-      <div className="mb-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
-        <Stat label="ทั้งหมด" value={stats.total} />
-        <Stat label="รอตรวจ" value={stats.pending} tone="text-gold" />
-        <Stat label="อนุมัติแล้ว" value={stats.approved} tone="text-success" />
-        <Stat label="ปฏิเสธ" value={stats.rejected} tone="text-danger" />
-      </div>
-
-      <div className="mb-3 flex flex-col gap-2 sm:flex-row">
-        <TextInput
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder="🔍 ค้นหา Discord ID, ชื่อ..."
-        />
-        <select
-          value={statusFilter}
-          onChange={(e) => setStatusFilter(e.target.value)}
-          aria-label="กรองตามสถานะ"
-          className="cursor-pointer rounded-sm border border-accent/15 bg-black/25 px-3 py-2.5 text-sm text-ink outline-none focus:border-accent/50"
-        >
-          <option value="">ทุกสถานะ</option>
-          <option value={PENDING}>{PENDING}</option>
-          <option value={APPROVED}>{APPROVED}</option>
-          <option value={REJECTED}>{REJECTED}</option>
-        </select>
-      </div>
-
-      {visible.length === 0 ? (
-        <div className="panel p-10 text-center text-sm text-ink-dim">💡 ไม่มีข้อมูล</div>
-      ) : (
-        <div className="panel overflow-x-auto">
-          <table className="w-full min-w-[820px] border-collapse text-sm">
-            <thead>
-              <tr className="border-b border-accent/12 bg-accent/5 text-left">
-                {['เวลา', 'Discord', 'ชื่อ IC', 'เบอร์', 'อายุ', 'Steam', 'สถานะ', 'จัดการ'].map(
-                  (h) => (
-                    <th key={h} className="px-3 py-2.5 text-xs font-bold whitespace-nowrap text-accent">
-                      {h}
-                    </th>
-                  )
-                )}
-              </tr>
-            </thead>
-
-            <tbody className="divide-y divide-white/5">
-              {visible.map((row) => {
-                const status = String(row[COL.status] ?? '');
-                const isPending = status === PENDING;
-
-                return (
-                  <tr key={row._row} className="transition hover:bg-white/[0.03]">
-                    <td className="px-3 py-2 text-xs whitespace-nowrap text-ink-dim">
-                      {String(row[COL.timestamp] ?? '')}
-                    </td>
-                    <td className="px-3 py-2">
-                      <div className="text-xs text-ink">{String(row[COL.discordName] ?? '')}</div>
-                      <div className="text-[0.65rem] text-ink-dim">
-                        {String(row[COL.discordId] ?? '')}
-                      </div>
-                    </td>
-                    <td className="px-3 py-2 text-xs text-ink">{String(row[COL.icName] ?? '')}</td>
-                    <td className="px-3 py-2 text-xs text-ink-dim">{String(row[COL.phone] ?? '')}</td>
-                    <td className="px-3 py-2 text-xs text-ink-dim">{String(row[COL.age] ?? '')}</td>
-                    <td className="max-w-[10rem] px-3 py-2">
-                      {row[COL.steam] ? (
-                        <a
-                          href={String(row[COL.steam])}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="block truncate text-xs text-accent hover:underline"
-                        >
-                          {String(row[COL.steam])}
-                        </a>
-                      ) : (
-                        <span className="text-xs text-ink-dim/50">-</span>
-                      )}
-                    </td>
-                    <td className="px-3 py-2">
-                      <span
-                        className={`rounded border px-2 py-0.5 text-[0.65rem] font-semibold whitespace-nowrap ${
-                          STATUS_STYLE[status] ?? 'border-white/10 bg-white/5 text-ink-dim'
-                        }`}
-                      >
-                        {status || '-'}
-                      </span>
-                    </td>
-                    <td className="px-3 py-2">
-                      {isPending ? (
-                        <div className="flex gap-1.5">
-                          <button
-                            type="button"
-                            onClick={() => void decide(row._row, true)}
-                            disabled={busy}
-                            className="cursor-pointer rounded bg-success/20 px-2 py-1 text-[0.7rem] font-semibold text-success transition hover:bg-success/30 disabled:opacity-40"
-                          >
-                            อนุมัติ
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => void decide(row._row, false)}
-                            disabled={busy}
-                            className="cursor-pointer rounded bg-danger/20 px-2 py-1 text-[0.7rem] font-semibold text-danger transition hover:bg-danger/30 disabled:opacity-40"
-                          >
-                            ปฏิเสธ
-                          </button>
-                        </div>
-                      ) : (
-                        <span className="text-[0.7rem] text-ink-dim/50">เสร็จสิ้น</span>
-                      )}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+        <div className="mb-4 flex justify-end">
+          <button
+            type="button"
+            onClick={() => void load(readPin() ?? pin)}
+            disabled={busy}
+            className="cursor-pointer rounded-lg bg-[#3a3a5a] px-4 py-2 text-sm font-semibold text-[#e0e0e0] transition hover:opacity-85 disabled:opacity-50"
+          >
+            🔄 โหลดใหม่
+          </button>
         </div>
-      )}
+
+        <div className="mb-5 flex flex-wrap gap-4">
+          <Stat label="ทั้งหมด" value={stats.total} />
+          <Stat label="รอตรวจ" value={stats.pending} />
+          <Stat label="อนุมัติแล้ว" value={stats.approved} />
+          <Stat label="ปฏิเสธ" value={stats.rejected} />
+        </div>
+
+        <div className="mb-4 flex flex-wrap items-center gap-2.5">
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="🔍 ค้นหา Discord ID, ชื่อ..."
+            className={`${inputClass} min-w-[200px] flex-1`}
+          />
+          <select
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+            aria-label="กรองตามสถานะ"
+            className="cursor-pointer rounded-lg border border-[#3a3a5a] bg-[#252545] px-2.5 py-2.5 text-sm text-white outline-none"
+          >
+            <option value="">ทุกสถานะ</option>
+            <option value={PENDING}>{PENDING}</option>
+            <option value={APPROVED}>{APPROVED}</option>
+            <option value={REJECTED}>{REJECTED}</option>
+          </select>
+        </div>
+
+        {visible.length === 0 ? (
+          <div className="rounded-lg border border-[#2a2a4a] bg-[#1a1a2e] p-10 text-center text-[#666]">
+            ไม่มีข้อมูล
+          </div>
+        ) : (
+          <div className="max-h-[600px] overflow-auto rounded-lg border border-[#2a2a4a]">
+            <table className="w-full min-w-[820px] border-collapse text-sm">
+              <thead>
+                <tr className="sticky top-0 bg-[#252545] text-left text-[11px] tracking-wide text-[#aaa] uppercase">
+                  {['เวลา', 'Discord', 'ชื่อ IC', 'เบอร์', 'อายุ', 'Steam', 'สถานะ', 'จัดการ'].map(
+                    (h) => (
+                      <th key={h} className="px-3 py-3 font-semibold whitespace-nowrap">
+                        {h}
+                      </th>
+                    )
+                  )}
+                </tr>
+              </thead>
+
+              <tbody>
+                {visible.map((row) => {
+                  const status = String(row[COL.status] ?? '');
+                  const isPending = status === PENDING;
+
+                  return (
+                    <tr
+                      key={row._row}
+                      className="border-b border-[#2a2a4a] transition hover:bg-[#252545]"
+                    >
+                      <td className="px-3 py-3 text-xs whitespace-nowrap text-[#aaa]">
+                        {String(row[COL.timestamp] ?? '')}
+                      </td>
+                      <td className="px-3 py-3">
+                        <div className="text-xs text-[#e0e0e0]">
+                          {String(row[COL.discordName] ?? '')}
+                        </div>
+                        <div className="text-[0.65rem] text-[#888]">
+                          {String(row[COL.discordId] ?? '')}
+                        </div>
+                      </td>
+                      <td className="px-3 py-3 text-xs text-[#e0e0e0]">
+                        {String(row[COL.icName] ?? '')}
+                      </td>
+                      <td className="px-3 py-3 text-xs text-[#aaa]">
+                        {String(row[COL.phone] ?? '')}
+                      </td>
+                      <td className="px-3 py-3 text-xs text-[#aaa]">
+                        {String(row[COL.age] ?? '')}
+                      </td>
+                      <td className="max-w-[10rem] px-3 py-3">
+                        {row[COL.steam] ? (
+                          <a
+                            href={String(row[COL.steam])}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="block truncate text-xs text-[#f0c040] hover:underline"
+                          >
+                            {String(row[COL.steam])}
+                          </a>
+                        ) : (
+                          <span className="text-xs text-[#666]">-</span>
+                        )}
+                      </td>
+                      <td className="px-3 py-3">
+                        <span
+                          className={`rounded-full px-2.5 py-0.5 text-[12px] font-semibold whitespace-nowrap ${
+                            STATUS_STYLE[status] ?? 'bg-[#3a3a5a] text-[#e0e0e0]'
+                          }`}
+                        >
+                          {status || '-'}
+                        </span>
+                      </td>
+                      <td className="px-3 py-3">
+                        {isPending ? (
+                          <div className="flex gap-1.5">
+                            <button
+                              type="button"
+                              onClick={() => void decide(row._row, true)}
+                              disabled={busy}
+                              className="cursor-pointer rounded-lg bg-[#22c55e] px-2.5 py-1.5 text-[13px] font-semibold text-white transition hover:opacity-85 disabled:opacity-40"
+                            >
+                              อนุมัติ
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => void decide(row._row, false)}
+                              disabled={busy}
+                              className="cursor-pointer rounded-lg bg-[#ef4444] px-2.5 py-1.5 text-[13px] font-semibold text-white transition hover:opacity-85 disabled:opacity-40"
+                            >
+                              ปฏิเสธ
+                            </button>
+                          </div>
+                        ) : (
+                          <span className="text-[13px] text-[#888]">เสร็จสิ้น</span>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
 
-function Stat({ label, value, tone = 'text-accent' }: { label: string; value: number; tone?: string }) {
+function Stat({ label, value }: { label: string; value: number }) {
   return (
-    <div className="panel px-3 py-3 text-center">
-      <div className={`text-xl font-bold ${tone}`}>{value}</div>
-      <div className="text-[0.7rem] text-ink-dim">{label}</div>
+    <div className="min-w-[150px] flex-1 rounded-[10px] border border-[#2a2a4a] bg-[#1a1a2e] px-6 py-4 text-center">
+      <div className="text-[32px] font-bold text-[#f0c040]">{value}</div>
+      <div className="mt-1 text-[13px] text-[#888]">{label}</div>
     </div>
   );
 }
