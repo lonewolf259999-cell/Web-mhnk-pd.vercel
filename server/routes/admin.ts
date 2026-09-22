@@ -12,6 +12,28 @@ import { ApiError, requirePin } from '@/server/errors';
 export const adminRoutes = new Elysia({ name: 'admin' })
   .get('/schedule-config', () => scheduleConfig)
 
+  /* Checks a PIN and does nothing else, so the PIN prompt can reject a wrong
+     code where it is typed instead of on the first real action. A wrong PIN
+     is an answer rather than a failure — a lockout or an unset ADMIN_PIN
+     still surfaces as an error, because those are not "try again". Attempts
+     count toward requirePin's lockout exactly like any other admin call. */
+  .post(
+    '/pin/verify',
+    ({ body, request }) => {
+      try {
+        requirePin(body, request);
+      } catch (err) {
+        if (err instanceof ApiError && err.status === 401) {
+          return { valid: false, message: err.message };
+        }
+        throw err;
+      }
+
+      return { valid: true, message: '' };
+    },
+    { body: t.Object({ pin: t.String() }) }
+  )
+
   .post(
     '/mark-paid',
     async ({ body, request }) => {

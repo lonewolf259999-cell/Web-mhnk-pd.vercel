@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { mutations } from '@/lib/client/queries';
 
 function Backdrop({ onClose, children }: { onClose: () => void; children: React.ReactNode }) {
   useEffect(() => {
@@ -37,20 +38,44 @@ export function PinModal({
   onCancel: () => void;
 }) {
   const [pin, setPin] = useState('');
+  const [checking, setChecking] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     inputRef.current?.focus();
   }, []);
 
+  /* The PIN only lives on the server, so the prompt asks before it closes —
+     otherwise a wrong code looks accepted until the first admin action. */
+  async function check(e: React.FormEvent) {
+    e.preventDefault();
+    if (!pin || checking) return;
+
+    setChecking(true);
+    setError(null);
+
+    try {
+      const result = await mutations.verifyPin(pin);
+      if (!result.valid) {
+        setError(result.message);
+        setChecking(false);
+        inputRef.current?.select();
+        return;
+      }
+    } catch (err) {
+      // Locked out, PIN not configured, or the request never landed.
+      setError((err as Error).message);
+      setChecking(false);
+      return;
+    }
+
+    onSubmit(pin);
+  }
+
   return (
     <Backdrop onClose={onCancel}>
-      <form
-        onSubmit={(e) => {
-          e.preventDefault();
-          if (pin) onSubmit(pin);
-        }}
-      >
+      <form onSubmit={check}>
         <div className="mb-4 flex items-center justify-between gap-3">
           <h3 className="text-base font-bold text-[#f77f07]">🔐 {title}</h3>
           <button
@@ -67,13 +92,24 @@ export function PinModal({
           ref={inputRef}
           type="password"
           value={pin}
-          onChange={(e) => setPin(e.target.value)}
+          onChange={(e) => {
+            setPin(e.target.value);
+            setError(null);
+          }}
           placeholder="PIN"
           autoComplete="off"
-          className="mb-4 w-full rounded-sm border border-[#f77f07]/20 bg-black/30 px-3 py-2.5 text-center text-lg tracking-widest text-ink outline-none focus:border-[#f77f07]/50"
+          className={`w-full rounded-sm border bg-black/30 px-3 py-2.5 text-center text-lg tracking-widest text-ink outline-none ${
+            error ? 'border-danger/60' : 'border-[#f77f07]/20 focus:border-[#f77f07]/50'
+          }`}
         />
 
-        <div className="flex gap-2.5">
+        {error && (
+          <p role="alert" className="mt-2 text-center text-sm font-medium text-danger">
+            ❌ {error}
+          </p>
+        )}
+
+        <div className="mt-4 flex gap-2.5">
           <button
             type="button"
             onClick={onCancel}
@@ -83,10 +119,10 @@ export function PinModal({
           </button>
           <button
             type="submit"
-            disabled={!pin}
+            disabled={!pin || checking}
             className="flex-1 cursor-pointer rounded-sm bg-[#f77f07] py-2.5 text-sm font-semibold text-night transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-40"
           >
-            ยืนยัน
+            {checking ? 'กำลังตรวจสอบ...' : 'ยืนยัน'}
           </button>
         </div>
       </form>

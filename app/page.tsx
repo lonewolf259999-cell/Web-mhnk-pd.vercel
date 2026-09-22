@@ -15,7 +15,7 @@ import { PinModal } from '@/components/ui/Modal';
 import { useApi } from '@/lib/client/api';
 import { queries } from '@/lib/client/queries';
 import { filterByQuery } from '@/lib/format';
-import { clearPin, isAdminMode, savePin } from '@/lib/client/adminPin';
+import { clearPin, isAdminMode, savePin, verifyStoredPin } from '@/lib/client/adminPin';
 
 export default function HomePage() {
   const [page, setPage] = useState<PageId>('roster');
@@ -23,7 +23,10 @@ export default function HomePage() {
 
   const [adminMode, setAdminMode] = useState(false);
   const [pinPrompt, setPinPrompt] = useState(false);
-  useEffect(() => setAdminMode(isAdminMode()), []);
+  useEffect(() => {
+    setAdminMode(isAdminMode());
+    void verifyStoredPin().then(setAdminMode);
+  }, []);
 
   /* Each tab's data is a separate Google Sheets round trip, so a tab is
      fetched the first time it is opened and kept from then on — switching

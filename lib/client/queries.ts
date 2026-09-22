@@ -37,6 +37,9 @@ export const queries = {
 export const mutations = {
   refresh: (pin: string) => unwrap(client.api.refresh.post({ pin })),
 
+  /** Is this the admin PIN? Answers without performing an admin action. */
+  verifyPin: (pin: string) => unwrap(client.api.pin.verify.post({ pin })),
+
   markPaid: (
     input: { pin: string; weekName: string; officerName: string; idempotencyKey?: string },
     signal?: AbortSignal

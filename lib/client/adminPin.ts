@@ -3,6 +3,8 @@
 /* Admin PIN kept in localStorage for 30 minutes so a batch of actions
    doesn't prompt on every request. */
 
+import { mutations } from './queries';
+
 const STORAGE_KEY = 'mhnk_payment_pin';
 const TTL_MS = 30 * 60 * 1000;
 
@@ -50,4 +52,20 @@ export function clearPin(): void {
 
 export function isAdminMode(): boolean {
   return readPin() !== null;
+}
+
+/** Confirms the remembered PIN is still the server's, so admin mode can't
+    linger on a PIN that has since changed. A request that never landed is
+    not an answer, so the PIN survives it. */
+export async function verifyStoredPin(): Promise<boolean> {
+  const pin = readPin();
+  if (!pin) return false;
+
+  try {
+    const { valid } = await mutations.verifyPin(pin);
+    if (!valid) clearPin();
+    return valid;
+  } catch {
+    return true;
+  }
 }
