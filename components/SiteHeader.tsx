@@ -1,6 +1,12 @@
 /* eslint-disable @next/next/no-img-element */
 
-export function SiteHeader({ children }: { children?: React.ReactNode }) {
+export function SiteHeader({
+  children,
+  extraBadge,
+}: {
+  children?: React.ReactNode;
+  extraBadge?: React.ReactNode;
+}) {
   return (
     <header className="relative z-10 border-b border-accent/12 bg-gradient-to-b from-[rgba(15,23,42,0.98)] to-[rgba(10,15,30,0.95)] px-4 pt-3 pb-4 md:px-6 md:pt-4 md:pb-5">
       <div className="mb-4 flex flex-wrap items-center justify-center gap-3 md:mb-5 md:gap-4">
@@ -21,9 +27,10 @@ export function SiteHeader({ children }: { children?: React.ReactNode }) {
           </div>
         </div>
 
-        <div className="hidden shrink-0 gap-1.5 md:flex">
+        <div className="hidden shrink-0 items-center gap-1.5 md:flex">
           <HeaderBadge>◆ FIVEM</HeaderBadge>
           <HeaderBadge>⚖ POLICE</HeaderBadge>
+          {extraBadge}
         </div>
       </div>
 

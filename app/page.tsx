@@ -55,7 +55,28 @@ export default function HomePage() {
 
   return (
     <div className="flex min-h-screen flex-col">
-      <SiteHeader>
+      <SiteHeader
+        extraBadge={
+          <button
+            type="button"
+            onClick={() => {
+              if (adminMode) {
+                clearPin();
+                setAdminMode(false);
+              } else {
+                setPinPrompt(true);
+              }
+            }}
+            className={`cursor-pointer rounded-md border px-2.5 py-1 text-[0.55rem] font-bold tracking-wide whitespace-nowrap transition ${
+              adminMode
+                ? 'border-[#f77f07] bg-[#f77f07] text-white'
+                : 'border-[#f77f07]/30 bg-[#f77f07]/10 text-[#f77f07] hover:bg-[#f77f07]/20'
+            }`}
+          >
+            ♛ Admin
+          </button>
+        }
+      >
         <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between lg:gap-6">
           <SearchBar
             value={query}
@@ -63,27 +84,7 @@ export default function HomePage() {
             resultCount={filteredOfficers.length}
             totalCount={allOfficers.length}
           />
-          <div className="flex items-center gap-2">
-            <NavTabs active={page} onChange={openPage} />
-            <button
-              type="button"
-              onClick={() => {
-                if (adminMode) {
-                  clearPin();
-                  setAdminMode(false);
-                } else {
-                  setPinPrompt(true);
-                }
-              }}
-              className={`cursor-pointer rounded-md border px-2.5 py-1 text-[0.65rem] font-bold whitespace-nowrap transition ${
-                adminMode
-                  ? 'border-[#f77f07] bg-[#f77f07] text-white'
-                  : 'border-[#f77f07]/30 bg-[#f77f07]/10 text-[#f77f07] hover:bg-[#f77f07]/20'
-              }`}
-            >
-              ♛ Admin
-            </button>
-          </div>
+          <NavTabs active={page} onChange={openPage} />
         </div>
       </SiteHeader>
 

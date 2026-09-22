@@ -32,6 +32,7 @@ interface Props {
   type: RulesType;
   adminMode: boolean;
   onDataChanged: () => void;
+  headerTrailing?: React.ReactNode;
 }
 
 type Entry = RuleItem & ConductItem;
@@ -51,6 +52,7 @@ export function RulesView({
   type,
   adminMode,
   onDataChanged,
+  headerTrailing,
 }: Props) {
   const toast = useToast();
   const [modal, setModal] = useState<{ mode: 'add' | 'edit'; item: Entry | null } | null>(null);
@@ -119,7 +121,7 @@ export function RulesView({
 
   return (
     <section>
-      <SectionHeader icon={icon} title={title} />
+      <SectionHeader icon={icon} title={title} trailing={headerTrailing} />
 
       {adminMode && <AdminBar onAdd={() => setModal({ mode: 'add', item: null })} />}
 

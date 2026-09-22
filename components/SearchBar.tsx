@@ -12,7 +12,7 @@ export function SearchBar({
   totalCount: number;
 }) {
   return (
-    <div className="min-w-0 flex-1">
+    <div className="w-full min-w-0 lg:max-w-[500px]">
       <div className="relative flex items-center">
         <span className="pointer-events-none absolute left-3 text-sm" aria-hidden>
           🔍

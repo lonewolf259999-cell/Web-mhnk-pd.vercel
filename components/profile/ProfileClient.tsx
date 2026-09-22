@@ -311,38 +311,38 @@ export function ProfileClient() {
     );
   }
 
-  if (notFound || !officer) {
-    return (
-      <div className="flex min-h-screen flex-col items-center justify-center gap-4 px-4 text-center">
-        <p className="text-base text-ink-dim">ไม่พบข้อมูลเจ้าหน้าที่</p>
+  const header = (
+    <header className="relative z-10 border-b border-accent/12 bg-gradient-to-b from-[rgba(15,23,42,0.98)] to-[rgba(10,15,30,0.95)] px-4 py-4 md:px-6">
+      {/* v2's header-top is a single centered, wrapping row — back link, logo,
+          title block and badges all sit together, not split left/right. */}
+      <div className="mx-auto flex max-w-[800px] flex-wrap items-center justify-center gap-4">
         <Link
           href="/"
-          className="rounded-sm border border-accent/30 bg-accent/10 px-4 py-2 text-sm font-semibold text-accent transition hover:bg-accent/20"
+          className="flex items-center gap-2 rounded-lg px-3 py-2 text-ink-dim transition hover:bg-accent/10 hover:text-accent"
         >
-          กลับหน้าหลัก
+          <span aria-hidden className="text-xl">
+            ←
+          </span>
+          <span className="text-sm font-semibold">กลับ</span>
         </Link>
-      </div>
-    );
-  }
 
-  return (
-    <div className="flex min-h-screen flex-col">
-      <header className="relative z-10 border-b border-accent/12 bg-gradient-to-b from-[rgba(15,23,42,0.98)] to-[rgba(10,15,30,0.95)] px-4 py-3 md:px-6">
-        <div className="mx-auto flex max-w-[800px] items-center justify-between gap-3">
-          <Link
-            href="/"
-            className="flex items-center gap-2 rounded-sm px-2 py-1.5 text-sm font-semibold text-ink-dim transition hover:bg-accent/10 hover:text-accent"
-          >
-            <span aria-hidden>←</span> กลับ
-          </Link>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src="/logo.gif"
+          alt="MHNK PD Logo"
+          width={72}
+          height={72}
+          className="h-[72px] w-[72px] shrink-0 object-cover transition-transform duration-300 hover:scale-105"
+        />
 
-          <div className="min-w-0 text-center">
-            <h1 className="truncate text-sm font-bold text-ink md:text-base">ประวัติเจ้าหน้าที่</h1>
-            <div className="text-[0.55rem] tracking-[2px] text-ink-dim uppercase">
-              กรมตำรวจ <span className="text-accent">MHNK</span>
-            </div>
+        <div>
+          <h1 className="text-center text-[1.15rem] font-bold text-ink">ประวัติเจ้าหน้าที่</h1>
+          <div className="mt-0.5 text-center text-[0.6rem] tracking-[3px] text-ink-dim uppercase">
+            กรมตำรวจ <span className="text-accent">MHNK</span> — Mahahorn Diwa
           </div>
+        </div>
 
+        <div className="flex shrink-0 items-center gap-1.5">
           <button
             type="button"
             onClick={() => {
@@ -353,16 +353,57 @@ export function ProfileClient() {
                 setPinPrompt('admin');
               }
             }}
-            className={`cursor-pointer rounded-md border px-2.5 py-1 text-[0.6rem] font-bold transition ${
+            className={`cursor-pointer rounded-md border px-2.5 py-1 text-[0.55rem] font-bold tracking-wide transition ${
               adminMode
-                ? 'border-gold/40 bg-gold/15 text-gold'
-                : 'border-white/10 bg-white/5 text-ink-dim hover:text-ink'
+                ? 'border-[#f77f07] bg-[#f77f07] text-white'
+                : 'border-[#f77f07]/30 bg-[#f77f07]/10 text-[#f77f07] hover:bg-[#f77f07]/20'
             }`}
           >
             ♛ Admin
           </button>
+          <span className="rounded-md border border-accent/15 bg-accent/10 px-2.5 py-1 text-[0.55rem] font-bold tracking-wide text-accent">
+            ◆ PROFILE
+          </span>
+          <span className="rounded-md border border-accent/15 bg-accent/10 px-2.5 py-1 text-[0.55rem] font-bold tracking-wide text-accent">
+            ⚖ POLICE
+          </span>
         </div>
-      </header>
+      </div>
+    </header>
+  );
+
+  if (notFound || !officer) {
+    return (
+      <div className="flex min-h-screen flex-col">
+        {header}
+        <main className="mx-auto w-full max-w-[800px] flex-1 px-4 py-6">
+          <div className="panel px-5 py-[60px] text-center">
+            <p className="mb-5 text-[1.1rem] text-ink-dim">ไม่พบข้อมูลเจ้าหน้าที่</p>
+            <div className="flex flex-wrap justify-center gap-3">
+              <Link
+                href="/"
+                className="inline-block rounded-lg bg-accent px-6 py-2.5 font-semibold text-night transition hover:bg-accent-dark hover:-translate-y-px"
+              >
+                กลับหน้าหลัก
+              </Link>
+              <button
+                type="button"
+                onClick={() => window.location.reload()}
+                className="inline-block cursor-pointer rounded-lg bg-accent px-6 py-2.5 font-semibold text-night transition hover:bg-accent-dark hover:-translate-y-px"
+              >
+                รีเฟรช
+              </button>
+            </div>
+          </div>
+        </main>
+        <SiteFooter />
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex min-h-screen flex-col">
+      {header}
 
       <main className="mx-auto w-full max-w-[800px] flex-1 space-y-5 px-4 py-6">
         <section className="panel space-y-4 p-5 text-center">
