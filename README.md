@@ -72,11 +72,14 @@ Vercel ตรวจจับ Next.js ให้อัตโนมัติ ไม
 npm run dev        # next dev — มี auto-reload
 npm run build      # next build — รันก่อนสรุปว่างานพร้อม deploy
 npm run typecheck  # tsc --noEmit — ตัวเช็คความถูกต้องที่เร็วที่สุด
-npm run lint       # next lint
+npm run lint       # eslint . — flat config in eslint.config.mjs
 npm run package    # ประกอบ .next/standalone สำหรับ self-host (ดูหัวข้อ DirectAdmin)
 ```
 
-ไม่มี test suite — `typecheck` และการ build คือการตรวจสอบอัตโนมัติที่มี
+ไม่มี test suite — `typecheck`, `lint` และการ build คือการตรวจสอบอัตโนมัติที่มี
+
+`lint` เรียก ESLint CLI ตรง ๆ ไม่ใช่ `next lint` (ซึ่งเลิกใช้แล้วใน Next 15 และถูกถอดออกใน 16)
+ตั้งค่าอยู่ใน `eslint.config.mjs` และ `eslint-config-next` ถูกล็อกให้เป็นเวอร์ชันหลักเดียวกับ `next`
 
 ---
 

@@ -243,7 +243,9 @@ export async function markOfficerAsPaid(weekName: string, officerName: string) {
   const sheets = getSheets();
   const response = await sheets.spreadsheets.values.get({
     spreadsheetId: config.CASES_SHEET_ID,
-    range: `${weekName}!A:A`,
+    // Week names carry spaces and full stops ("28 มิ.ย. - 5 ก.ค."), which A1
+    // notation only accepts inside single quotes — as the write below does.
+    range: `'${weekName}'!A:A`,
   });
 
   const rows = response.data.values;

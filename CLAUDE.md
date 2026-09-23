@@ -8,11 +8,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 npm run dev        # next dev
 npm run build      # next build — run before assuming a change is deployable
 npm run typecheck  # tsc --noEmit — the fastest correctness check
-npm run lint       # next lint
+npm run lint       # eslint . — flat config in eslint.config.mjs
 npm run package    # assemble .next/standalone for self-hosting (see below)
 ```
 
-There is no test suite. `typecheck` plus a build is the only automated verification, so both matter.
+There is no test suite. `typecheck`, `lint` and a build are the only automated verification, so all three matter.
+
+`lint` runs the ESLint CLI, not `next lint`: that command is deprecated in Next 15 and removed in 16, and ESLint was never actually a dependency here, so the old script only ever opened an interactive setup prompt. `eslint-config-next` is pinned to the same major as `next`.
 
 `next dev` holds file handles on Windows: a `git mv` of a watched directory fails with `EACCES` until the dev server is stopped. Stale `.next` output after moving routes produces a misleading `Cannot find module for page: /x` at build time — delete `.next` and rebuild before investigating further.
 
