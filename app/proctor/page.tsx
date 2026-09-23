@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { ProctorPanel } from '@/components/forms/ProctorPanel';
+import './proctor.css';
 
 export const metadata: Metadata = {
   title: 'Admin - MHNK Police Department',

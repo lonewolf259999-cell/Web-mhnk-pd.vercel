@@ -54,11 +54,13 @@ function HeaderBadge({ children }: { children: React.ReactNode }) {
   );
 }
 
+/* Sizes, opacity and the white-ish rule come from v2's footer.css, where the
+   footer is deliberately faint enough to sit under the content. */
 export function SiteFooter({ department = 'MHNK POLICE DEPARTMENT' }: { department?: string }) {
   return (
-    <footer className="relative z-10 border-t border-accent/12 px-6 py-6 text-center text-xs text-ink-dim">
-      <p>
-        © 2026 <span className="font-semibold text-accent">{department}</span> — FiveM Server
+    <footer className="relative z-10 border-t border-white/5 bg-[rgba(10,15,30,0.5)] p-4 text-center md:p-5">
+      <p className="text-[0.6rem] tracking-[0.3px] text-ink-dim opacity-45 md:text-[0.65rem]">
+        © 2026 <span className="text-accent opacity-100">{department}</span> — FiveM Server
       </p>
     </footer>
   );

@@ -11,6 +11,7 @@ import { SiteFooter } from '@/components/SiteHeader';
 import { ConfirmModal, CopyButton, PinModal } from '@/components/ui/Modal';
 import { useToast } from '@/components/ui/Toast';
 import { Loading } from '@/components/ui/States';
+import { PageLoader } from './PageLoader';
 import { WeekSelector } from './WeekSelector';
 import { DutyTable, WeekStats } from './WeekStats';
 import { toWeekStatus, type WeekStatus } from './types';
@@ -306,10 +307,21 @@ export function ProfileClient() {
 
   /* ---------- render ---------- */
 
+  /* Boot screen stages, matching v2: the officer lookup, then the per-week
+     payment checks. It stays up until one of them settles the page. */
+  const bootStage = loading ? 1 : totals === null ? 2 : 3;
+  const booted = !loading && (notFound || totals !== null);
+
+  /* Every branch below returns the same root element with the loader as its
+     first child, so React keeps one PageLoader instance as the page settles.
+     Returning a different shape here would remount it and restart the bar. */
   if (loading) {
     return (
-      <div className="flex min-h-screen items-center justify-center">
-        <Loading label="กำลังโหลดข้อมูล..." />
+      <div className="flex min-h-screen flex-col">
+        <PageLoader stage={bootStage} ready={booted} />
+        <div className="flex flex-1 items-center justify-center">
+          <Loading label="กำลังโหลดข้อมูล..." />
+        </div>
       </div>
     );
   }
@@ -378,6 +390,7 @@ export function ProfileClient() {
   if (notFound || !officer) {
     return (
       <div className="flex min-h-screen flex-col">
+        <PageLoader stage={bootStage} ready={booted} />
         {header}
         <main className="mx-auto w-full max-w-[800px] flex-1 px-4 py-6">
           <div className="panel px-5 py-[60px] text-center">
@@ -406,6 +419,7 @@ export function ProfileClient() {
 
   return (
     <div className="flex min-h-screen flex-col">
+      <PageLoader stage={bootStage} ready={booted} />
       {header}
 
       <main className="mx-auto w-full max-w-[800px] flex-1 space-y-5 px-4 py-6">
@@ -434,11 +448,15 @@ export function ProfileClient() {
             />
           </div>
 
+          {/* Cumulative totals carry v2's amber treatment, which is what marks
+              them as career figures rather than this week's numbers. */}
           {totals && (
-            <div className="mx-auto grid max-w-lg grid-cols-3 gap-2 border-t border-white/5 pt-4">
-              <SmallStat label="รวมคดีทั้งหมด" value={totals.cases.toLocaleString()} />
-              <SmallStat label="รวม Take 2" value={totals.take2.toLocaleString()} />
-              <SmallStat label="รวมคุมสอบ" value={totals.interrogations.toLocaleString()} />
+            <div className="mx-auto max-w-lg rounded-xl border border-[rgba(247,127,7,0.2)] bg-[rgba(247,127,7,0.08)] px-5 py-4">
+              <div className="flex flex-wrap justify-center gap-3">
+                <TotalStat label="รวมคดีทั้งหมด" value={totals.cases.toLocaleString()} />
+                <TotalStat label="รวม Take 2" value={totals.take2.toLocaleString()} />
+                <TotalStat label="รวมคุมสอบ" value={totals.interrogations.toLocaleString()} />
+              </div>
             </div>
           )}
 
@@ -571,6 +589,18 @@ function SmallStat({
       <div className={`truncate font-bold ${tones[tone]} ${small ? 'text-[0.65rem]' : 'text-sm'}`}>
         {value}
       </div>
+    </div>
+  );
+}
+
+/** One figure inside the amber cumulative-totals panel (v2's .total-stat-item). */
+function TotalStat({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="min-w-[80px] flex-1 rounded-[10px] bg-black/20 px-2 py-1.5 text-center sm:min-w-[100px] sm:px-3 sm:py-2">
+      <span className="mb-1 block text-[11px] font-medium tracking-[0.5px] text-ink-dim uppercase">
+        {label}
+      </span>
+      <span className="block text-base font-extrabold text-[#f0c040] sm:text-xl">{value}</span>
     </div>
   );
 }

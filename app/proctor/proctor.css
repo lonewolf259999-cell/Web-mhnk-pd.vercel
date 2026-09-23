@@ -1,0 +1,147 @@
+/* Ported verbatim from the v2 page (public/proctor.html inline stylesheet), with selectors scoped to .proctor-page and keyframes namespaced so nothing leaks into other routes. */
+
+/* ========== Reset & Base ========== */
+.proctor-page * { margin: 0; padding: 0; box-sizing: border-box; }
+.proctor-page { font-family: 'Segoe UI', Tahoma, sans-serif; background: #0f0f1a; color: #e0e0e0; min-height: 100vh; }
+.proctor-page .container { max-width: 1200px; margin: 0 auto; padding: 20px; }
+.proctor-page h1 { text-align: center; color: #f0c040; margin-bottom: 10px; font-size: 28px; }
+.proctor-page .subtitle { text-align: center; color: #888; margin-bottom: 30px; }
+
+/* ========== Form Elements ========== */
+.proctor-page input[type="password"], .proctor-page input[type="text"] {
+    width: 100%; padding: 12px 16px; background: #252545; border: 1px solid #3a3a5a;
+    border-radius: 8px; color: #fff; font-size: 16px; outline: none; margin-bottom: 15px;
+}
+.proctor-page input:focus { border-color: #f0c040; }
+.proctor-page input:disabled { opacity: 0.35; cursor: not-allowed; }
+
+.proctor-page button {
+    padding: 10px 24px; border: none; border-radius: 8px; font-size: 15px; cursor: pointer;
+    transition: all 0.2s; font-weight: 600;
+}
+.proctor-page button:hover { opacity: 0.85; transform: translateY(-1px); }
+.proctor-page button:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+
+/* ========== Buttons ========== */
+.proctor-page .btn-primary { background: #f0c040; color: #1a1a2e; }
+.proctor-page .btn-success { background: #22c55e; color: #fff; }
+.proctor-page .btn-danger { background: #ef4444; color: #fff; }
+.proctor-page .btn-secondary { background: #3a3a5a; color: #e0e0e0; }
+.proctor-page .btn-sm { padding: 6px 16px; font-size: 13px; }
+
+.proctor-page .btn-discord {
+    display: inline-flex; align-items: center; gap: 10px;
+    padding: 12px 24px; background: #5865F2; color: #fff;
+    border-radius: 8px; font-size: 15px; font-weight: 600;
+    cursor: pointer; text-decoration: none; transition: background 0.2s;
+}
+.proctor-page .btn-discord:hover { background: #4752c4; }
+.proctor-page .btn-discord:disabled { opacity: 0.4; cursor: not-allowed; }
+
+/* ========== Login Box ========== */
+.proctor-page .login-box, .proctor-page .panel {
+    background: #1a1a2e; border-radius: 12px; padding: 24px;
+    margin-bottom: 20px; border: 1px solid #2a2a4a;
+}
+.proctor-page .login-box { max-width: 420px; margin: 40px auto; text-align: center; }
+
+.proctor-page .dc-section {
+    margin-bottom: 20px; padding-bottom: 20px; border-bottom: 1px solid #2a2a4a;
+}
+.proctor-page .dc-section .dc-user {
+    display: flex; align-items: center; gap: 12px; justify-content: center;
+}
+.proctor-page .dc-section .dc-avatar {
+    width: 44px; height: 44px; border-radius: 50%;
+    border: 2px solid #5865F2; flex-shrink: 0;
+}
+.proctor-page .dc-section .dc-info { text-align: left; }
+.proctor-page .dc-section .dc-name { font-size: 15px; font-weight: 600; color: #e0e0e0; }
+.proctor-page .dc-section .dc-id { font-size: 12px; color: #888; }
+.proctor-page .dc-section .dc-disconnect {
+    background: none; border: none; color: #888; cursor: pointer;
+    padding: 4px; border-radius: 4px; display: inline-flex; align-items: center; margin-left: 8px;
+}
+.proctor-page .dc-section .dc-disconnect:hover { color: #ef4444; background: #2a2a4a; }
+.proctor-page .dc-section-label { color: #888; font-size: 13px; margin-bottom: 12px; display: block; }
+
+/* ========== Stats ========== */
+.proctor-page .stats { display: flex; gap: 16px; margin-bottom: 20px; flex-wrap: wrap; }
+.proctor-page .stat-card {
+    background: #1a1a2e; border-radius: 10px; padding: 16px 24px;
+    flex: 1; min-width: 150px; text-align: center; border: 1px solid #2a2a4a;
+}
+.proctor-page .stat-card .num { font-size: 32px; font-weight: 700; color: #f0c040; }
+.proctor-page .stat-card .label { font-size: 13px; color: #888; margin-top: 4px; }
+
+/* ========== Filter Bar ========== */
+.proctor-page .filter-bar { display: flex; gap: 10px; margin-bottom: 15px; flex-wrap: wrap; align-items: center; }
+.proctor-page .filter-bar input { width: auto; flex: 1; min-width: 200px; margin-bottom: 0; }
+
+/* ========== Table ========== */
+.proctor-page .table-wrap { max-height: 600px; overflow-y: auto; }
+.proctor-page .table-wrap table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+.proctor-page .table-wrap th, .proctor-page .table-wrap td {
+    padding: 12px 6px; text-align: left; border-bottom: 1px solid #2a2a4a;
+    font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.proctor-page .table-wrap th {
+    background: #252545; color: #aaa; font-size: 12px;
+    text-transform: uppercase; letter-spacing: 0.5px; position: sticky; top: 0;
+}
+.proctor-page .table-wrap tr:hover td { background: #252545; }
+
+.proctor-page .col-idx { width: 32px; }
+.proctor-page .col-time { width: 110px; }
+.proctor-page .col-did { width: 160px; min-width: 160px; overflow: visible !important; }
+.proctor-page .col-did code { overflow: visible; text-overflow: clip; white-space: normal; word-break: break-all; }
+.proctor-page .col-dname { width: 120px; }
+.proctor-page .col-icname { width: 120px; }
+.proctor-page .col-phone { width: 80px; }
+.proctor-page .col-age { width: 50px; }
+.proctor-page .col-steam { width: 120px; }
+.proctor-page .col-status { width: 80px; }
+.proctor-page .col-actions { width: 160px; }
+
+.proctor-page .status-badge { display: inline-block; padding: 3px 10px; border-radius: 20px; font-size: 12px; font-weight: 600; }
+.proctor-page .status-pending { background: #f59e0b33; color: #f59e0b; }
+.proctor-page .status-approved { background: #22c55e33; color: #22c55e; }
+.proctor-page .status-rejected { background: #ef444433; color: #ef4444; }
+
+/* ========== Actions Column (จัดการ) ========== */
+.proctor-page .actions { display: flex; gap: 6px; width: 100%; }
+.proctor-page .actions button { flex: 1; min-width: 0; text-align: center; white-space: nowrap; }
+.proctor-page .actions .btn-done {
+    background: #2a2a4a; color: #888; font-size: 13px; font-weight: 600;
+    border: none; border-radius: 8px; cursor: not-allowed; padding: 6px 4px; width: 100%;
+}
+
+/* ========== Toast ========== */
+.proctor-page .toast {
+    position: fixed; top: 20px; right: 20px; padding: 12px 20px; border-radius: 8px;
+    color: #fff; font-weight: 600; z-index: 999; display: none; animation: pr-fadeIn 0.3s;
+}
+.proctor-page .toast.success { background: #22c55e; }
+.proctor-page .toast.error { background: #ef4444; }
+@keyframes pr-fadeIn { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
+
+/* ========== Loading ========== */
+.proctor-page .loading { text-align: center; padding: 40px; color: #888; }
+.proctor-page .loading::after { content: '...'; animation: pr-dots 1.5s infinite; }
+@keyframes pr-dots { 0%,20% { content: '.'; } 40% { content: '..'; } 60%,100% { content: '...'; } }
+
+/* ========== Misc ========== */
+.proctor-page .empty-msg { text-align: center; padding: 40px; color: #666; font-size: 16px; }
+.proctor-page .log-section { margin-top: 30px; }
+.proctor-page .log-section summary { cursor: pointer; color: #888; font-size: 14px; padding: 8px 0; }
+.proctor-page .log-section pre {
+    background: #0f0f1a; padding: 12px; border-radius: 8px; font-size: 12px;
+    max-height: 200px; overflow-y: auto; color: #aaa; margin-top: 8px;
+}
+/* ========== Page backdrop ==========
+   The v2 page had no decorative layers and its own body colour; the shared
+   layout renders them for every route, so they are switched off here. */
+body:has(.proctor-page) { background: #0f0f1a; }
+body:has(.proctor-page) .scanner-line,
+body:has(.proctor-page) .bg-glow,
+body:has(.proctor-page) .bg-dots { display: none; }
