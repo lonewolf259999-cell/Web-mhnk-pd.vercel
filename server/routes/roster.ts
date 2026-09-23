@@ -22,8 +22,11 @@ export const rosterRoutes = new Elysia({ name: 'roster' })
 
   .post(
     '/refresh',
-    async ({ body }) => {
-      requirePin(body);
+    async ({ body, request }) => {
+      /* request is not optional in practice: without it every caller shares
+         one lockout bucket, so ten wrong PINs from anyone lock this endpoint
+         for everybody on the instance — and the guesser stays anonymous. */
+      requirePin(body, request);
       const officers = await refreshAll();
       return {
         success: true as const,

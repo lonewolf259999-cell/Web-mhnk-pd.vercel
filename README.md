@@ -21,7 +21,7 @@ Stack: **Next.js 15 (App Router) · React 19 · TypeScript · Tailwind v4 · Ely
 | `GOOGLE_JSON_KEY` (service-account JSON ทั้งก้อน บรรทัดเดียว) | ✅ |
 | `DISCORD_CLIENT_ID`, `DISCORD_CLIENT_SECRET` | ✅ |
 | `APP_URL` | ✅ |
-| `DISCORD_REGISTER_WEBHOOK_URL`, `DISCORD_MEDICAL_WEBHOOK_URL`, `DISCORD_PROCTOR_WEBHOOK_URL`, `DISCORD_COUNCIL_WEBHOOK_URL`, `DISCORD_OUTPD_WEBHOOK_URL` | ✅ |
+| `DISCORD_REGISTER_WEBHOOK_URL`, `DISCORD_MEDICAL_WEBHOOK_URL`, `DISCORD_PROCTOR_WEBHOOK_URL`, `DISCORD_OUTPD_WEBHOOK_URL` | ✅ |
 | `CASES_DATA_SHEET_ID`, `PENDING_SPREADSHEET_ID`, `ROSTER_SHEET_ID`, `PENDING_SHEET_NAME`, `PORT` | 🔶 มีค่า default |
 
 **Discord OAuth ต้องตรงกันทุกจุด:** `APP_URL`, โดเมนจริงที่เสิร์ฟเว็บ, และ redirect URI
@@ -91,6 +91,7 @@ Web-Mhnk/
 │   ├── api/[[...slugs]]/     # Elysia mounted as one catch-all function
 │   ├── auth/discord/         # OAuth login + callback (plain route handlers)
 │   ├── profile/              # หน้าข้อมูลเจ้าหน้าที่ + จ่ายเงิน
+│   ├── police/                # ศูนย์รวมระบบตำรวจ (ต้องใส่ PIN) — ทางเข้า 4 หน้าล่าง
 │   ├── register/              # สมัครตำรวจ
 │   ├── medical/               # สมัครหน่วยแพทย์
 │   ├── proctor/                # Admin: ตรวจใบสมัคร
@@ -117,7 +118,7 @@ Web-Mhnk/
 │   ├── format.ts                    # Ranks, currency, grouping, search
 │   └── sanitize.ts                  # Allowlist sanitizer for Sheets rich text
 ├── public/                     # Static assets served at /
-│   ├── logo.gif, vs.png
+│   └── logo.gif
 ├── data/                       # schedule.json
 └── scripts/package-standalone.mjs   # Assembles .next/standalone for self-hosting
 ```

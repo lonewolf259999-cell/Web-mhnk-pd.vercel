@@ -68,12 +68,6 @@ export interface CaseItem {
 }
 
 export type RulesType = 'conduct' | 'rules' | 'fines';
-export type RulesReadType = RulesType | 'cases';
-
-export type RulesItem = ConductItem | RuleItem | FineItem;
-
-/** Envelope every route handler responds with. */
-export type ApiResponse<T> = { success: true; data: T } | { success: false; error: string };
 
 export interface ScheduleDay {
   key: string;

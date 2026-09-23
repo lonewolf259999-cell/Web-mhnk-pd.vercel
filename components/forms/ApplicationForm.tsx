@@ -9,7 +9,7 @@
 
 import Link from 'next/link';
 import type { DiscordAuthState } from '@/lib/client/useDiscordAuth';
-import { DiscordIcon } from './Field';
+import { DiscordIcon } from './DiscordIcon';
 
 /** Shared class strings; `accent` swaps the teal treatment for medical's red. */
 export const applicationPageClasses = {

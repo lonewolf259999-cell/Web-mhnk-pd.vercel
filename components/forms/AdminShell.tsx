@@ -9,7 +9,7 @@
 import Link from 'next/link';
 import { useCallback, useRef, useState } from 'react';
 import type { DiscordAuthState } from '@/lib/client/useDiscordAuth';
-import { DiscordIcon } from './Field';
+import { DiscordIcon } from './DiscordIcon';
 
 export type ToastKind = 'success' | 'error';
 
