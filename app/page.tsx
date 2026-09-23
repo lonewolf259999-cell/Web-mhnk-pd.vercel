@@ -16,6 +16,7 @@ import { useApi } from '@/lib/client/api';
 import { queries } from '@/lib/client/queries';
 import { filterByQuery } from '@/lib/format';
 import { clearPin, isAdminMode, savePin, verifyStoredPin } from '@/lib/client/adminPin';
+import './home.css';
 
 export default function HomePage() {
   const [page, setPage] = useState<PageId>('roster');
@@ -57,7 +58,7 @@ export default function HomePage() {
   );
 
   return (
-    <div className="flex min-h-screen flex-col">
+    <div className="home-page flex min-h-screen flex-col">
       <SiteHeader
         extraBadge={
           <button
@@ -80,7 +81,7 @@ export default function HomePage() {
           </button>
         }
       >
-        <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between lg:gap-6">
+        <div className="header-nav-row">
           <SearchBar
             value={query}
             onChange={setQuery}
@@ -91,12 +92,16 @@ export default function HomePage() {
         </div>
       </SiteHeader>
 
-      <div className="mx-auto flex w-full max-w-[1500px] flex-1 flex-col items-start gap-5 px-4 pt-6 pb-12 lg:flex-row lg:gap-7 lg:px-6">
-        <div className="order-2 w-full lg:order-1 lg:w-auto">
-          <WeeklyTop10 weeks={weeks.data ?? []} />
-        </div>
+      {/* w-full is load-bearing: v2's .app-layout centres itself with
+          `margin: 0 auto`, and an auto cross-axis margin cancels the stretch
+          it would otherwise get from this flex column — leaving it to
+          shrink-wrap its content and spill past the viewport. */}
+      <div className="app-layout w-full flex-1">
+        <WeeklyTop10 weeks={weeks.data ?? []} />
 
-        <main className="order-1 min-w-0 flex-1 lg:order-2">
+        {/* Keyed by tab so React swaps the subtree outright — that is what
+            replays the entrance animation instead of cross-fading two tabs. */}
+        <main className="main-content tab-panel" key={page}>
           {page === 'roster' &&
             (officers.loading ? (
               <Loading />
@@ -170,9 +175,7 @@ export default function HomePage() {
             ))}
         </main>
 
-        <div className="order-3 w-full lg:w-auto">
-          <AllTimeTop10 officers={allOfficers} />
-        </div>
+        <AllTimeTop10 officers={allOfficers} />
       </div>
 
       <SiteFooter />

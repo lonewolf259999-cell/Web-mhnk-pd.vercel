@@ -46,9 +46,10 @@ export function SiteHeader({
   );
 }
 
+/* Radius and tracking follow v2's .header-badge, not Tailwind's nearest step. */
 function HeaderBadge({ children }: { children: React.ReactNode }) {
   return (
-    <span className="rounded-md border border-accent/15 bg-accent/10 px-2.5 py-1 text-[0.55rem] font-bold tracking-wide text-accent">
+    <span className="rounded-[6px] border border-accent/15 bg-accent/10 px-2.5 py-1 text-[0.55rem] font-bold tracking-[0.5px] text-accent">
       {children}
     </span>
   );

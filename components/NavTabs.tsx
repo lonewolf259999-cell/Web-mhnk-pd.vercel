@@ -11,6 +11,8 @@ export const PAGES = [
 
 export type PageId = (typeof PAGES)[number]['id'];
 
+/** v2's tab strip (src/styles/components/nav.css). The icon lives in its own
+    span because the narrowest breakpoint hides it and keeps the label. */
 export function NavTabs({
   active,
   onChange,
@@ -19,7 +21,7 @@ export function NavTabs({
   onChange: (page: PageId) => void;
 }) {
   return (
-    <nav className="flex flex-wrap gap-1.5" aria-label="หน้าหลัก">
+    <nav className="nav-tabs" aria-label="หน้าหลัก">
       {PAGES.map((page) => {
         const isActive = page.id === active;
         return (
@@ -28,15 +30,9 @@ export function NavTabs({
             type="button"
             onClick={() => onChange(page.id)}
             aria-current={isActive ? 'page' : undefined}
-            className={[
-              'flex cursor-pointer items-center gap-1.5 rounded-[10px] border px-3 py-2 text-xs font-semibold whitespace-nowrap transition',
-              isActive
-                ? 'border-accent/40 bg-accent/10 text-accent shadow-[0_0_16px_rgba(29,201,183,0.06)]'
-                : 'border-white/5 bg-white/[0.02] text-ink-dim hover:border-accent/20 hover:text-ink',
-            ].join(' ')}
+            className={`nav-tab${isActive ? ' active' : ''}`}
           >
-            <span aria-hidden>{page.icon}</span>
-            {page.label}
+            <span aria-hidden>{page.icon}</span> {page.label}
           </button>
         );
       })}

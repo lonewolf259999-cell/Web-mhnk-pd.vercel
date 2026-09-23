@@ -11,64 +11,51 @@ interface Entry {
   cases: number;
 }
 
+/** v2's sidebar card (src/styles/components/sidebar.css). */
 function Panel({
+  side,
   title,
   badge,
   children,
 }: {
+  side: 'left' | 'right';
   title: React.ReactNode;
   badge: string;
   children: React.ReactNode;
 }) {
   return (
-    <aside className="panel w-full shrink-0 p-3 lg:w-[340px]">
-      <div className="mb-3 flex items-center justify-between gap-2 border-b border-accent/12 pb-2">
-        <h3 className="text-sm font-bold text-ink">{title}</h3>
-        <span className="rounded border border-accent/20 bg-accent/10 px-1.5 py-0.5 text-[0.6rem] font-bold text-accent">
-          {badge}
-        </span>
+    <aside className={`sidebar sidebar-${side}`}>
+      <div className="sidebar-card">
+        <div className="sidebar-header">
+          <h3>{title}</h3>
+          <span className="sidebar-badge">{badge}</span>
+        </div>
+        {children}
       </div>
-      {children}
     </aside>
   );
 }
 
+/* The first three places carry their own medal colours, which the stylesheet
+   applies through :nth-child — so the list order is what drives them. */
 function TopList({ entries, empty }: { entries: Entry[]; empty: string }) {
   if (entries.length === 0) {
-    return <div className="py-6 text-center text-xs text-ink-dim">{empty}</div>;
+    return <div className="top-empty">{empty}</div>;
   }
 
   return (
-    <ol className="space-y-1">
+    <div className="top-list">
       {entries.map((entry, index) => (
-        <li
-          key={`${entry.name}-${index}`}
-          className="flex items-center gap-2.5 rounded-sm px-1.5 py-1.5 transition hover:bg-white/[0.03]"
-        >
-          <span
-            className={[
-              'flex h-6 w-6 shrink-0 items-center justify-center rounded text-[0.7rem] font-bold',
-              index === 0
-                ? 'bg-gold/20 text-gold'
-                : index < 3
-                  ? 'bg-accent/15 text-accent'
-                  : 'bg-white/5 text-ink-dim',
-            ].join(' ')}
-          >
-            {index + 1}
-          </span>
-
-          <div className="min-w-0 flex-1">
-            <div className="truncate text-xs font-medium text-ink">{entry.name}</div>
-            <div className="truncate text-[0.65rem] text-ink-dim">{entry.rank}</div>
+        <div className="top-item" key={`${entry.name}-${index}`}>
+          <span className="top-rank">{index + 1}</span>
+          <div className="top-info">
+            <div className="top-name">{entry.name}</div>
+            <div className="top-rank-label">{entry.rank}</div>
           </div>
-
-          <span className="text-xs font-bold text-accent tabular-nums">
-            {entry.cases.toLocaleString()}
-          </span>
-        </li>
+          <span className="top-cases">{entry.cases.toLocaleString()}</span>
+        </div>
       ))}
-    </ol>
+    </div>
   );
 }
 
@@ -113,19 +100,20 @@ export function WeeklyTop10({ weeks }: { weeks: string[] }) {
 
   return (
     <Panel
+      side="left"
       title={
         <>
-          ★ <span className="text-accent">TOP 10</span>
-          {selected && <span className="ml-1 text-xs font-normal text-ink-dim">({selected})</span>}
+          ★ <span>TOP 10</span>
+          {selected && ` (${selected})`}
         </>
       }
       badge="เคส"
     >
       <select
+        className="week-select"
         value={selected}
         onChange={(e) => setSelected(e.target.value)}
         aria-label="เลือกสัปดาห์"
-        className="mb-3 w-full cursor-pointer rounded-sm border border-accent/12 bg-panel px-2.5 py-2 text-xs text-ink outline-none focus:border-accent/40"
       >
         {realWeeks.length === 0 && <option value="">กำลังโหลด...</option>}
         {realWeeks.map((week) => (
@@ -135,12 +123,8 @@ export function WeeklyTop10({ weeks }: { weeks: string[] }) {
         ))}
       </select>
 
-      {status === 'loading' && (
-        <div className="py-6 text-center text-xs text-ink-dim">กำลังโหลด...</div>
-      )}
-      {status === 'error' && (
-        <div className="py-6 text-center text-xs text-danger">โหลดไม่สำเร็จ</div>
-      )}
+      {status === 'loading' && <div className="top-empty">กำลังโหลด...</div>}
+      {status === 'error' && <div className="top-empty">โหลดไม่สำเร็จ</div>}
       {status === 'idle' && <TopList entries={entries} empty="ไม่มีข้อมูล" />}
     </Panel>
   );
@@ -161,9 +145,10 @@ export function AllTimeTop10({ officers }: { officers: Officer[] }) {
 
   return (
     <Panel
+      side="right"
       title={
         <>
-          ★ <span className="text-accent">TOP 10</span> เคส
+          ★ <span>TOP 10</span> เคส
         </>
       }
       badge="TOP"

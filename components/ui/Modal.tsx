@@ -3,6 +3,9 @@
 import { useEffect, useRef, useState } from 'react';
 import { mutations } from '@/lib/client/queries';
 
+/** How many digit slots the PIN prompt draws. A shorter PIN simply fills fewer. */
+const PIN_SLOTS = 6;
+
 function Backdrop({ onClose, children }: { onClose: () => void; children: React.ReactNode }) {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -40,6 +43,7 @@ export function PinModal({
   const [pin, setPin] = useState('');
   const [checking, setChecking] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [focused, setFocused] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -88,23 +92,60 @@ export function PinModal({
           </button>
         </div>
 
+        {/* The slots are decoration over one real field: a single input keeps
+            mobile keyboards, paste and autofill working, and keeps the value
+            in one place. Clicking anywhere on the row focuses it. */}
+        <div
+          className={`pin-slots${error ? ' is-wrong' : ''}`}
+          onMouseDown={(e) => {
+            e.preventDefault();
+            inputRef.current?.focus();
+          }}
+        >
+          {Array.from({ length: PIN_SLOTS }, (_, i) => {
+            const filled = i < pin.length;
+            const active = focused && i === Math.min(pin.length, PIN_SLOTS - 1);
+
+            return (
+              <div
+                key={i}
+                aria-hidden
+                className={[
+                  'pin-slot',
+                  filled ? 'is-filled' : '',
+                  active && !filled ? 'is-active' : '',
+                  error ? 'is-wrong' : '',
+                ]
+                  .filter(Boolean)
+                  .join(' ')}
+              >
+                {filled ? '•' : active ? <span className="pin-caret" /> : null}
+              </div>
+            );
+          })}
+        </div>
+
         <input
           ref={inputRef}
           type="password"
+          inputMode="numeric"
           value={pin}
+          maxLength={PIN_SLOTS}
           onChange={(e) => {
-            setPin(e.target.value);
+            setPin(e.target.value.slice(0, PIN_SLOTS));
             setError(null);
           }}
-          placeholder="PIN"
+          onFocus={() => setFocused(true)}
+          onBlur={() => setFocused(false)}
           autoComplete="off"
-          className={`w-full rounded-sm border bg-black/30 px-3 py-2.5 text-center text-lg tracking-widest text-ink outline-none ${
-            error ? 'border-danger/60' : 'border-[#f77f07]/20 focus:border-[#f77f07]/50'
-          }`}
+          aria-label={title}
+          /* Off-screen rather than hidden: display:none would make it
+             unfocusable and kill typing altogether. */
+          className="absolute h-px w-px opacity-0"
         />
 
         {error && (
-          <p role="alert" className="mt-2 text-center text-sm font-medium text-danger">
+          <p role="alert" className="mt-3 text-center text-sm font-medium text-danger">
             ❌ {error}
           </p>
         )}

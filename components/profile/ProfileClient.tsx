@@ -11,11 +11,10 @@ import { SiteFooter } from '@/components/SiteHeader';
 import { ConfirmModal, CopyButton, PinModal } from '@/components/ui/Modal';
 import { useToast } from '@/components/ui/Toast';
 import { Loading } from '@/components/ui/States';
-import { PageLoader } from './PageLoader';
 import { WeekSelector } from './WeekSelector';
 import { DutyTable, WeekStats } from './WeekStats';
 import { toWeekStatus, type WeekStatus } from './types';
-import type { Officer, WeekOfficerData } from '@/lib/types';
+import type { Officer, WeekData, WeekOfficerData } from '@/lib/types';
 
 const PAYMENT_TIMEOUT_MS = 10_000;
 
@@ -52,6 +51,27 @@ export function ProfileClient() {
      lags behind writes, so a re-fetch can still report them unpaid — these
      override whatever comes back. */
   const paidThisSession = useRef<Set<string>>(new Set());
+
+  /* One request per week, shared by the status sweep and the week the officer
+     is looking at. Without it the visible week is fetched twice on open and
+     again every time it is revisited — the slowest part of this page is the
+     number of Sheets round trips, not any one of them. The promise is cached
+     rather than the result, so callers that arrive together share a request. */
+  const weekCache = useRef(new Map<string, Promise<WeekData>>());
+
+  const fetchWeek = useCallback((week: string): Promise<WeekData> => {
+    const inFlight = weekCache.current.get(week);
+    if (inFlight) return inFlight;
+
+    const pending = queries.weekData(week).catch((error: unknown) => {
+      // A failure must not be cached, or the week can never recover.
+      weekCache.current.delete(week);
+      throw error;
+    });
+
+    weekCache.current.set(week, pending);
+    return pending;
+  }, []);
 
   /* ---------- initial load ---------- */
 
@@ -115,7 +135,7 @@ export function ProfileClient() {
         }
 
         try {
-          const data = await queries.weekData(week);
+          const data = await fetchWeek(week);
           const entry = findOfficerWeekData(data, officerName);
 
           if (entry) {
@@ -138,7 +158,7 @@ export function ProfileClient() {
 
     setStatuses((prev) => ({ ...prev, ...Object.fromEntries(resolved) }));
     setTotals(running);
-  }, [weeks, officerName]);
+  }, [weeks, officerName, fetchWeek]);
 
   useEffect(() => {
     void refreshStatuses();
@@ -155,36 +175,42 @@ export function ProfileClient() {
 
   /* ---------- active week ---------- */
 
+  /* `silent` is for the background poll: swapping a filled card for a spinner
+     every minute reads as the page breaking, so a refresh leaves what is on
+     screen alone and only replaces it once the new figures arrive. Switching
+     weeks is not silent — there the spinner is the honest answer. */
   const loadWeek = useCallback(
-    async (week: string) => {
+    async (week: string, silent = false) => {
       if (!officerName) return;
-      setWeekLoading(true);
+      if (!silent) setWeekLoading(true);
 
       try {
-        const data = await queries.weekData(week);
+        const data = await fetchWeek(week);
         const entry = findOfficerWeekData(data, officerName);
 
         if (entry && paidThisSession.current.has(week)) entry.paid = 'จ่ายแล้ว';
         setWeekData(entry);
       } catch {
-        setWeekData(null);
+        if (!silent) setWeekData(null);
       } finally {
-        setWeekLoading(false);
+        if (!silent) setWeekLoading(false);
       }
     },
-    [officerName]
+    [officerName, fetchWeek]
   );
 
   useEffect(() => {
     if (activeWeek) void loadWeek(activeWeek);
   }, [activeWeek, loadWeek]);
 
-  /* Poll the active week so a payment made elsewhere shows up. */
+  /* Poll the active week so a payment made elsewhere shows up. Both caches
+     have to go: the shared one here and the fetch hook's. */
   useEffect(() => {
     if (!activeWeek) return;
     const timer = setInterval(() => {
+      weekCache.current.delete(activeWeek);
       clearApiCache('week_');
-      void loadWeek(activeWeek);
+      void loadWeek(activeWeek, true);
     }, 60_000);
     return () => clearInterval(timer);
   }, [activeWeek, loadWeek]);
@@ -289,8 +315,11 @@ export function ProfileClient() {
         return next;
       });
       setSelected(new Set());
+      weekCache.current.clear();
       clearApiCache('week_');
-      if (activeWeek) void loadWeek(activeWeek);
+      // Silent: the toast already reported the result, and paidThisSession
+      // has the card showing "จ่ายแล้ว" — a spinner here would only flicker.
+      if (activeWeek) void loadWeek(activeWeek, true);
     }
 
     setPaying(false);
@@ -307,18 +336,9 @@ export function ProfileClient() {
 
   /* ---------- render ---------- */
 
-  /* Boot screen stages, matching v2: the officer lookup, then the per-week
-     payment checks. It stays up until one of them settles the page. */
-  const bootStage = loading ? 1 : totals === null ? 2 : 3;
-  const booted = !loading && (notFound || totals !== null);
-
-  /* Every branch below returns the same root element with the loader as its
-     first child, so React keeps one PageLoader instance as the page settles.
-     Returning a different shape here would remount it and restart the bar. */
   if (loading) {
     return (
       <div className="flex min-h-screen flex-col">
-        <PageLoader stage={bootStage} ready={booted} />
         <div className="flex flex-1 items-center justify-center">
           <Loading label="กำลังโหลดข้อมูล..." />
         </div>
@@ -357,7 +377,15 @@ export function ProfileClient() {
           </div>
         </div>
 
+        {/* Same order as the home page: the two identity badges, then the
+            Admin toggle last. Radius and tracking match v2's .header-badge. */}
         <div className="flex shrink-0 items-center gap-1.5">
+          <span className="rounded-[6px] border border-accent/15 bg-accent/10 px-2.5 py-1 text-[0.55rem] font-bold tracking-[0.5px] text-accent">
+            ◆ PROFILE
+          </span>
+          <span className="rounded-[6px] border border-accent/15 bg-accent/10 px-2.5 py-1 text-[0.55rem] font-bold tracking-[0.5px] text-accent">
+            ⚖ POLICE
+          </span>
           <button
             type="button"
             onClick={() => {
@@ -368,7 +396,7 @@ export function ProfileClient() {
                 setPinPrompt('admin');
               }
             }}
-            className={`cursor-pointer rounded-md border px-2.5 py-1 text-[0.55rem] font-bold tracking-wide transition ${
+            className={`cursor-pointer rounded-[6px] border px-2.5 py-1 text-[0.55rem] font-bold tracking-[0.5px] whitespace-nowrap transition ${
               adminMode
                 ? 'border-[#f77f07] bg-[#f77f07] text-white'
                 : 'border-[#f77f07]/30 bg-[#f77f07]/10 text-[#f77f07] hover:bg-[#f77f07]/20'
@@ -376,12 +404,6 @@ export function ProfileClient() {
           >
             ♛ Admin
           </button>
-          <span className="rounded-md border border-accent/15 bg-accent/10 px-2.5 py-1 text-[0.55rem] font-bold tracking-wide text-accent">
-            ◆ PROFILE
-          </span>
-          <span className="rounded-md border border-accent/15 bg-accent/10 px-2.5 py-1 text-[0.55rem] font-bold tracking-wide text-accent">
-            ⚖ POLICE
-          </span>
         </div>
       </div>
     </header>
@@ -390,7 +412,6 @@ export function ProfileClient() {
   if (notFound || !officer) {
     return (
       <div className="flex min-h-screen flex-col">
-        <PageLoader stage={bootStage} ready={booted} />
         {header}
         <main className="mx-auto w-full max-w-[800px] flex-1 px-4 py-6">
           <div className="panel px-5 py-[60px] text-center">
@@ -419,7 +440,6 @@ export function ProfileClient() {
 
   return (
     <div className="flex min-h-screen flex-col">
-      <PageLoader stage={bootStage} ready={booted} />
       {header}
 
       <main className="mx-auto w-full max-w-[800px] flex-1 space-y-5 px-4 py-6">

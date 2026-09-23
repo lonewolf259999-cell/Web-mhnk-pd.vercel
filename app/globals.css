@@ -37,11 +37,37 @@
   --border-accent: rgba(29, 201, 183, 0.12);
   --border-subtle: rgba(255, 255, 255, 0.05);
   --text-muted: rgba(148, 163, 184, 0.5);
+
+  /* v2's own token names (src/styles/variables.css). The per-route
+     stylesheets beside each page are byte-for-byte copies of v2's and refer
+     to these directly; the aliases are what let those files stay untouched. */
+  --color-bg-primary: #0a0f1e;
+  --color-bg-secondary: #111827;
+  --color-bg-card: rgba(17, 24, 39, 0.8);
+  --color-accent-soft: rgba(29, 201, 183, 0.1);
+  --color-accent-glow: rgba(29, 201, 183, 0.06);
+  --color-text-primary: #f1f5f9;
+  --color-text-secondary: #94a3b8;
+  --color-text-muted: rgba(148, 163, 184, 0.5);
+  --color-border: rgba(29, 201, 183, 0.12);
+  --color-border-subtle: rgba(255, 255, 255, 0.05);
+
+  --card-padding: 16px;
+  --sidebar-width: 340px;
+  --content-max-width: 1500px;
+
+  --transition-fast: 0.2s ease;
+  --transition-normal: 0.3s ease;
 }
 
 @layer base {
   html {
     scroll-behavior: smooth;
+
+    /* Keep the scrollbar's width reserved at all times. Without it, moving
+       from a long tab to a short one removes the scrollbar and every centred
+       element jumps sideways by its width. */
+    scrollbar-gutter: stable;
   }
 
   body {
@@ -56,6 +82,25 @@
   img {
     max-width: 100%;
     display: block;
+  }
+
+  /* v2's base.css defaults. Tailwind 4 ships buttons with `cursor: default`,
+     and the ported stylesheets never set a cursor of their own. */
+  button {
+    cursor: pointer;
+  }
+
+  a {
+    text-decoration: none;
+    color: inherit;
+  }
+
+  /* The search field draws no chrome of its own — `.search-wrapper` is the
+     box. Utilities still win over this, so Tailwind-styled inputs are safe. */
+  input {
+    border: none;
+    background: none;
+    outline: none;
   }
 
   /* Keyboard users need to see where they are. Mouse clicks don't trigger
@@ -231,5 +276,249 @@
   50% {
     opacity: 0.5;
     transform: scale(0.8);
+  }
+}
+
+/* ========================================
+   Search box and tab strip — ported verbatim from v2
+   (src/styles/components/search.css and nav.css).
+   Global rather than per-route: the home page and /regulation share them.
+   ======================================== */
+/* ========================================
+   Search Component
+   ======================================== */
+.search-section {
+    flex: 1;
+    max-width: 500px;
+    min-width: 200px;
+    margin-left: auto;
+}
+
+.search-wrapper {
+    display: flex;
+    align-items: center;
+    background: rgba(255,255,255,0.03);
+    border: 1px solid var(--color-border);
+    border-radius: 14px;
+    padding: 0 4px 0 14px;
+    transition: all var(--transition-normal);
+    backdrop-filter: blur(12px);
+}
+.search-wrapper:focus-within {
+    border-color: var(--color-accent);
+    box-shadow: 0 0 20px var(--color-accent-glow), 0 0 0 1px rgba(29,201,183,0.12);
+    background: rgba(255,255,255,0.05);
+}
+
+.search-icon {
+    font-size: 1rem;
+    color: var(--color-text-secondary);
+    opacity: 0.4;
+    flex-shrink: 0;
+}
+
+.search-input {
+    flex: 1;
+    padding: 12px 10px;
+    color: var(--color-text-primary);
+    font-size: 0.9rem;
+    font-weight: 400;
+}
+.search-input::placeholder {
+    color: var(--color-text-secondary);
+    opacity: 0.35;
+}
+
+.search-clear {
+    color: var(--color-text-secondary);
+    font-size: 1.1rem;
+    opacity: 0;
+    transition: all var(--transition-fast);
+    padding: 6px 12px;
+    border-radius: 0 14px 14px 0;
+}
+.search-clear.visible { opacity: 0.4; }
+.search-clear.visible:hover { opacity: 0.8; background: rgba(255,255,255,0.04); }
+
+.search-stats {
+    text-align: center;
+    margin-top: 8px;
+    font-size: 0.7rem;
+    color: var(--color-text-secondary);
+}
+.search-stats strong {
+    color: var(--color-accent);
+    font-weight: 600;
+}
+
+@media (max-width: 768px) {
+    .search-section { max-width: 100%; width: 100%; order: 1; }
+    .search-input { padding: 10px 8px; font-size: 0.85rem; }
+}
+/* ========================================
+   Navigation Component
+   ======================================== */
+.header-nav-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    max-width: 1300px;
+    margin: 0 auto;
+}
+
+.nav-tabs {
+    display: flex;
+    gap: 6px;
+    flex-shrink: 0;
+    flex-wrap: wrap;
+}
+
+.nav-tab {
+    padding: 10px 20px;
+    border: 1px solid var(--color-border);
+    border-radius: 10px;
+    background: rgba(255,255,255,0.02);
+    color: var(--color-text-secondary);
+    font-family: var(--font-thai);
+    font-size: 0.8rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+    white-space: nowrap;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    line-height: 1;
+}
+.nav-tab:hover {
+    border-color: rgba(29,201,183,0.25);
+    color: var(--color-text-primary);
+    background: rgba(255,255,255,0.04);
+}
+.nav-tab.active {
+    border-color: var(--color-accent);
+    color: var(--color-accent);
+    background: var(--color-accent-soft);
+    box-shadow: 0 0 16px rgba(29,201,183,0.06);
+}
+.nav-tab span { font-size: 0.9rem; }
+
+@media (max-width: 768px) {
+    .header-nav-row { flex-direction: column; gap: 12px; }
+    .nav-tabs { width: 100%; order: 2; }
+    .nav-tab { flex: 1; justify-content: center; padding: 8px 12px; font-size: 0.7rem; }
+}
+@media (max-width: 480px) {
+    .nav-tabs { gap: 4px; }
+    .nav-tab { padding: 6px 8px; font-size: 0.65rem; }
+    .nav-tab span { display: none; }
+}
+
+/* ========================================
+   PIN entry — segmented digit slots
+   ======================================== */
+@keyframes pinShake {
+  0%, 100% { transform: translateX(0); }
+  20% { transform: translateX(-6px); }
+  40% { transform: translateX(6px); }
+  60% { transform: translateX(-4px); }
+  80% { transform: translateX(4px); }
+}
+
+@keyframes pinCaret {
+  0%, 45% { opacity: 1; }
+  55%, 100% { opacity: 0; }
+}
+
+.pin-slots {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  cursor: text;
+}
+.pin-slots.is-wrong {
+  animation: pinShake 0.4s ease;
+}
+
+.pin-slot {
+  width: 46px;
+  height: 56px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 12px;
+  background: rgba(0, 0, 0, 0.35);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  font-size: 1.6rem;
+  line-height: 1;
+  color: #f77f07;
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease,
+    background 0.15s ease,
+    transform 0.15s ease;
+}
+.pin-slot.is-filled {
+  border-color: rgba(247, 127, 7, 0.55);
+  background: rgba(247, 127, 7, 0.1);
+}
+.pin-slot.is-active {
+  border-color: #f77f07;
+  box-shadow: 0 0 0 3px rgba(247, 127, 7, 0.16), 0 0 18px rgba(247, 127, 7, 0.3);
+  transform: translateY(-2px);
+}
+.pin-slot.is-wrong {
+  border-color: var(--color-danger);
+  background: rgba(239, 68, 68, 0.1);
+  color: var(--color-danger);
+}
+
+/* The blinking bar that marks where the next digit lands */
+.pin-caret {
+  width: 2px;
+  height: 24px;
+  border-radius: 2px;
+  background: #f77f07;
+  animation: pinCaret 1.1s step-end infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pin-slots.is-wrong,
+  .pin-caret {
+    animation: none;
+  }
+}
+
+@media (max-width: 420px) {
+  .pin-slots { gap: 7px; }
+  .pin-slot { width: 38px; height: 48px; font-size: 1.3rem; }
+}
+
+/* ========================================
+   Tab switching on the home page
+   ======================================== */
+
+/* The tab panels differ wildly in height, so the sidebars would jump every
+   time one is shorter than the viewport. A floor keeps the column steady. */
+.tab-panel {
+  min-height: 60vh;
+  animation: tabPanelIn 0.22s ease-out;
+}
+
+@keyframes tabPanelIn {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tab-panel {
+    animation: none;
   }
 }
