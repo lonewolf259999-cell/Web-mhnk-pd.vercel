@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { SiteFooter, SiteHeader } from '@/components/SiteHeader';
 import { NavTabs, type PageId } from '@/components/NavTabs';
 import { SearchBar } from '@/components/SearchBar';
@@ -19,11 +20,14 @@ import { clearPin, isAdminMode, savePin, verifyStoredPin } from '@/lib/client/ad
 import './home.css';
 
 export default function HomePage() {
+  const router = useRouter();
   const [page, setPage] = useState<PageId>('roster');
   const [query, setQuery] = useState('');
 
   const [adminMode, setAdminMode] = useState(false);
-  const [pinPrompt, setPinPrompt] = useState(false);
+  /* Both prompts ask for the same PIN; only what happens next differs —
+     'admin' unlocks editing in place, 'police' continues to /police. */
+  const [pinPrompt, setPinPrompt] = useState<null | 'admin' | 'police'>(null);
   useEffect(() => {
     setAdminMode(isAdminMode());
     void verifyStoredPin().then(setAdminMode);
@@ -60,6 +64,16 @@ export default function HomePage() {
   return (
     <div className="home-page flex min-h-screen flex-col">
       <SiteHeader
+        /* The ⚖ POLICE badge is the way into the staff hub. It stays a real
+           link so it can be opened in a new tab and prefetched, but a locked
+           visitor is held here for the PIN instead of bouncing off /police. */
+        badgeHref="/police"
+        badgeTitle="ศูนย์รวมระบบตำรวจ — ต้องใส่ PIN"
+        onBadgeClick={(e) => {
+          if (adminMode) return;
+          e.preventDefault();
+          setPinPrompt('police');
+        }}
         extraBadge={
           <button
             type="button"
@@ -68,7 +82,7 @@ export default function HomePage() {
                 clearPin();
                 setAdminMode(false);
               } else {
-                setPinPrompt(true);
+                setPinPrompt('admin');
               }
             }}
             className={`cursor-pointer rounded-md border px-2.5 py-1 text-[0.55rem] font-bold tracking-wide whitespace-nowrap transition ${
@@ -182,12 +196,18 @@ export default function HomePage() {
 
       {pinPrompt && (
         <PinModal
-          title="กรุณาระบุรหัสผ่านเพื่อเข้าโหมดผู้ดูแล"
-          onCancel={() => setPinPrompt(false)}
+          title={
+            pinPrompt === 'police'
+              ? 'กรุณาระบุรหัสผ่านเพื่อเข้าศูนย์รวมระบบตำรวจ'
+              : 'กรุณาระบุรหัสผ่านเพื่อเข้าโหมดผู้ดูแล'
+          }
+          onCancel={() => setPinPrompt(null)}
           onSubmit={(pin) => {
             savePin(pin);
-            setPinPrompt(false);
+            const mode = pinPrompt;
+            setPinPrompt(null);
             setAdminMode(true);
+            if (mode === 'police') router.push('/police');
           }}
         />
       )}

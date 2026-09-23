@@ -103,8 +103,11 @@
     outline: none;
   }
 
-  /* Keyboard users need to see where they are. Mouse clicks don't trigger
-     :focus-visible, so this never shows up as a stray ring on click. */
+  /* Keyboard users need to see where they are. Buttons and links only match
+     :focus-visible when the keyboard put focus there, so this stays out of
+     the way of mouse clicks — but a text field always matches it, so any
+     field that already draws its own focus state must opt out or it ends up
+     wearing two rings (see .search-input below). */
   :focus-visible {
     outline: 2px solid var(--color-accent);
     outline-offset: 2px;
@@ -327,6 +330,12 @@
 .search-input::placeholder {
     color: var(--color-text-secondary);
     opacity: 0.35;
+}
+/* .search-wrapper:focus-within above IS this field's focus indicator. Left to
+   the base :focus-visible rule the input would also draw its own 2px ring,
+   2px inside the wrapper — the two frames a click used to show. */
+.search-input:focus-visible {
+    outline: none;
 }
 
 .search-clear {

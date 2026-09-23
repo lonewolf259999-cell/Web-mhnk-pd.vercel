@@ -1,11 +1,20 @@
 /* eslint-disable @next/next/no-img-element */
 
+import Link from 'next/link';
+
+/* Radius and tracking follow v2's .header-badge, not Tailwind's nearest step. */
+const BADGE_CLASS =
+  'rounded-[6px] border border-accent/15 bg-accent/10 px-2.5 py-1 text-[0.55rem] font-bold tracking-[0.5px] text-accent';
+
 export function SiteHeader({
   children,
   extraBadge,
   title = 'Mahahorn Diwa Police Department',
   unit = 'กรมตำรวจ',
   badge = '⚖ POLICE',
+  badgeHref,
+  onBadgeClick,
+  badgeTitle,
 }: {
   children?: React.ReactNode;
   extraBadge?: React.ReactNode;
@@ -13,6 +22,11 @@ export function SiteHeader({
   title?: string;
   unit?: string;
   badge?: string;
+  /** Turns the department badge into a link. Left unset it stays a plain label. */
+  badgeHref?: string;
+  /** Lets the caller gate that link — e.g. ask for the PIN before leaving. */
+  onBadgeClick?: (e: React.MouseEvent<HTMLAnchorElement>) => void;
+  badgeTitle?: string;
 }) {
   return (
     <header className="relative z-10 border-b border-accent/12 bg-gradient-to-b from-[rgba(15,23,42,0.98)] to-[rgba(10,15,30,0.95)] px-4 pt-3 pb-4 md:px-6 md:pt-4 md:pb-5">
@@ -36,7 +50,20 @@ export function SiteHeader({
 
         <div className="hidden shrink-0 items-center gap-1.5 md:flex">
           <HeaderBadge>◆ FIVEM</HeaderBadge>
-          <HeaderBadge>{badge}</HeaderBadge>
+
+          {badgeHref ? (
+            <Link
+              href={badgeHref}
+              onClick={onBadgeClick}
+              title={badgeTitle}
+              className={`${BADGE_CLASS} cursor-pointer transition hover:-translate-y-px hover:border-accent/60 hover:bg-accent/20 hover:shadow-[0_0_14px_rgba(29,201,183,0.25)]`}
+            >
+              {badge}
+            </Link>
+          ) : (
+            <HeaderBadge>{badge}</HeaderBadge>
+          )}
+
           {extraBadge}
         </div>
       </div>
@@ -46,13 +73,8 @@ export function SiteHeader({
   );
 }
 
-/* Radius and tracking follow v2's .header-badge, not Tailwind's nearest step. */
 function HeaderBadge({ children }: { children: React.ReactNode }) {
-  return (
-    <span className="rounded-[6px] border border-accent/15 bg-accent/10 px-2.5 py-1 text-[0.55rem] font-bold tracking-[0.5px] text-accent">
-      {children}
-    </span>
-  );
+  return <span className={BADGE_CLASS}>{children}</span>;
 }
 
 /* Sizes, opacity and the white-ish rule come from v2's footer.css, where the

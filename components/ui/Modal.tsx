@@ -1,10 +1,9 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
+import Link from 'next/link';
 import { mutations } from '@/lib/client/queries';
-
-/** How many digit slots the PIN prompt draws. A shorter PIN simply fills fewer. */
-const PIN_SLOTS = 6;
+import { PinField, PIN_LENGTH } from './PinField';
 
 function Backdrop({ onClose, children }: { onClose: () => void; children: React.ReactNode }) {
   useEffect(() => {
@@ -31,55 +30,77 @@ function Backdrop({ onClose, children }: { onClose: () => void; children: React.
   );
 }
 
+/**
+ * Checks a PIN against the server, then hands it to `onSubmit`. The check
+ * happens before the prompt closes — otherwise a wrong code looks accepted
+ * until the first admin action fails.
+ *
+ * Returns `null` on success so callers can `await` a shared gate; the hook is
+ * only the plumbing, the markup belongs to whoever renders the field.
+ */
+export function usePinCheck(onSubmit: (pin: string) => void) {
+  const [pin, setPin] = useState('');
+  const [checking, setChecking] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const submit = useCallback(
+    async (candidate: string) => {
+      if (!candidate || checking) return;
+
+      setChecking(true);
+      setError(null);
+
+      try {
+        const result = await mutations.verifyPin(candidate);
+        if (!result.valid) {
+          setError(result.message);
+          setChecking(false);
+          setPin(''); // wrong code: clear the slots so the next attempt is typed fresh
+          return;
+        }
+      } catch (err) {
+        // Locked out, PIN not configured, or the request never landed.
+        setError((err as Error).message);
+        setChecking(false);
+        setPin('');
+        return;
+      }
+
+      onSubmit(candidate);
+    },
+    [checking, onSubmit]
+  );
+
+  const change = useCallback((next: string) => {
+    setPin(next);
+    setError(null);
+  }, []);
+
+  return { pin, change, submit, checking, error };
+}
+
 export function PinModal({
   title = 'กรุณาระบุรหัสผ่าน',
   onSubmit,
   onCancel,
+  /** Shown instead of a plain cancel when there is nowhere to fall back to. */
+  backHref,
 }: {
   title?: string;
   onSubmit: (pin: string) => void;
   onCancel: () => void;
+  backHref?: string;
 }) {
-  const [pin, setPin] = useState('');
-  const [checking, setChecking] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [focused, setFocused] = useState(false);
-  const inputRef = useRef<HTMLInputElement>(null);
-
-  useEffect(() => {
-    inputRef.current?.focus();
-  }, []);
-
-  /* The PIN only lives on the server, so the prompt asks before it closes —
-     otherwise a wrong code looks accepted until the first admin action. */
-  async function check(e: React.FormEvent) {
-    e.preventDefault();
-    if (!pin || checking) return;
-
-    setChecking(true);
-    setError(null);
-
-    try {
-      const result = await mutations.verifyPin(pin);
-      if (!result.valid) {
-        setError(result.message);
-        setChecking(false);
-        inputRef.current?.select();
-        return;
-      }
-    } catch (err) {
-      // Locked out, PIN not configured, or the request never landed.
-      setError((err as Error).message);
-      setChecking(false);
-      return;
-    }
-
-    onSubmit(pin);
-  }
+  const { pin, change, submit, checking, error } = usePinCheck(onSubmit);
 
   return (
     <Backdrop onClose={onCancel}>
-      <form onSubmit={check}>
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          void submit(pin);
+        }}
+      >
         <div className="mb-4 flex items-center justify-between gap-3">
           <h3 className="text-base font-bold text-[#f77f07]">🔐 {title}</h3>
           <button
@@ -92,56 +113,12 @@ export function PinModal({
           </button>
         </div>
 
-        {/* The slots are decoration over one real field: a single input keeps
-            mobile keyboards, paste and autofill working, and keeps the value
-            in one place. Clicking anywhere on the row focuses it. */}
-        <div
-          className={`pin-slots${error ? ' is-wrong' : ''}`}
-          onMouseDown={(e) => {
-            e.preventDefault();
-            inputRef.current?.focus();
-          }}
-        >
-          {Array.from({ length: PIN_SLOTS }, (_, i) => {
-            const filled = i < pin.length;
-            const active = focused && i === Math.min(pin.length, PIN_SLOTS - 1);
-
-            return (
-              <div
-                key={i}
-                aria-hidden
-                className={[
-                  'pin-slot',
-                  filled ? 'is-filled' : '',
-                  active && !filled ? 'is-active' : '',
-                  error ? 'is-wrong' : '',
-                ]
-                  .filter(Boolean)
-                  .join(' ')}
-              >
-                {filled ? '•' : active ? <span className="pin-caret" /> : null}
-              </div>
-            );
-          })}
-        </div>
-
-        <input
-          ref={inputRef}
-          type="password"
-          inputMode="numeric"
+        <PinField
           value={pin}
-          maxLength={PIN_SLOTS}
-          onChange={(e) => {
-            setPin(e.target.value.slice(0, PIN_SLOTS));
-            setError(null);
-          }}
-          onFocus={() => setFocused(true)}
-          onBlur={() => setFocused(false)}
-          autoComplete="off"
-          aria-label={title}
-          /* Off-screen rather than hidden: display:none would make it
-             unfocusable and kill typing altogether. */
-          className="absolute h-px w-px opacity-0"
+          onChange={change}
+          onComplete={(value) => void submit(value)}
+          wrong={Boolean(error)}
+          label={title}
         />
 
         {error && (
@@ -151,16 +128,25 @@ export function PinModal({
         )}
 
         <div className="mt-4 flex gap-2.5">
-          <button
-            type="button"
-            onClick={onCancel}
-            className="flex-1 cursor-pointer rounded-sm bg-white/10 py-2.5 text-sm font-semibold text-ink-dim transition hover:bg-white/15"
-          >
-            ยกเลิก
-          </button>
+          {backHref ? (
+            <Link
+              href={backHref}
+              className="flex-1 rounded-sm bg-white/10 py-2.5 text-center text-sm font-semibold text-ink-dim transition hover:bg-white/15"
+            >
+              ← กลับหน้าหลัก
+            </Link>
+          ) : (
+            <button
+              type="button"
+              onClick={onCancel}
+              className="flex-1 cursor-pointer rounded-sm bg-white/10 py-2.5 text-sm font-semibold text-ink-dim transition hover:bg-white/15"
+            >
+              ยกเลิก
+            </button>
+          )}
           <button
             type="submit"
-            disabled={!pin || checking}
+            disabled={pin.length < PIN_LENGTH || checking}
             className="flex-1 cursor-pointer rounded-sm bg-[#f77f07] py-2.5 text-sm font-semibold text-night transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-40"
           >
             {checking ? 'กำลังตรวจสอบ...' : 'ยืนยัน'}
