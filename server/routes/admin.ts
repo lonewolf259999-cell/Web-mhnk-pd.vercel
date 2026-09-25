@@ -8,6 +8,12 @@ import {
   setPaymentResult,
 } from '@/server/services/paymentStore';
 import { ApiError, requirePin } from '@/server/errors';
+import {
+  ADMIN_TTL_MS,
+  adminCookieHeader,
+  createAdminToken,
+  readAdminSession,
+} from '@/server/services/session';
 
 export const adminRoutes = new Elysia({ name: 'admin' })
   .get('/schedule-config', () => scheduleConfig)
@@ -19,20 +25,49 @@ export const adminRoutes = new Elysia({ name: 'admin' })
      count toward requirePin's lockout exactly like any other admin call. */
   .post(
     '/pin/verify',
-    ({ body, request }) => {
+    ({ body, request, set }) => {
+      const secure = new URL(request.url).protocol === 'https:';
+
       try {
         requirePin(body, request);
       } catch (err) {
         if (err instanceof ApiError && err.status === 401) {
+          // Drop any stale cookie so a wrong PIN also ends the old session.
+          set.headers['set-cookie'] = adminCookieHeader('', 0, secure);
           return { valid: false, message: err.message };
         }
         throw err;
       }
 
+      /* Hand back a short-lived HttpOnly cookie so the browser never has to
+         keep the PIN itself. Every later admin call authorises on this. */
+      set.headers['set-cookie'] = adminCookieHeader(
+        createAdminToken(),
+        Math.floor(ADMIN_TTL_MS / 1000),
+        secure
+      );
+
       return { valid: true, message: '' };
     },
     { body: t.Object({ pin: t.String() }) }
   )
+
+  /* Is there a live admin cookie? Deliberately separate from /pin/verify:
+     the page asks this on every load, and routing that through the PIN check
+     would spend a lockout attempt each time and lock the admin out of their
+     own console after ten refreshes. */
+  .get('/pin/session', ({ request }) => ({ valid: readAdminSession(request) }))
+
+  /* Ends the admin session server-side. The browser can't clear an HttpOnly
+     cookie itself, so "lock" has to ask for it. */
+  .post('/pin/logout', ({ request, set }) => {
+    set.headers['set-cookie'] = adminCookieHeader(
+      '',
+      0,
+      new URL(request.url).protocol === 'https:'
+    );
+    return { success: true };
+  })
 
   .post(
     '/mark-paid',

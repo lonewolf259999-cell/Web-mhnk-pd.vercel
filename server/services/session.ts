@@ -56,6 +56,68 @@ export function createSessionToken(userId: string): string {
   return `${payload}.${sign(payload, key)}`;
 }
 
+/* ---------- admin session ---------- */
+
+export const ADMIN_COOKIE = 'mhnk_admin';
+
+/** Matches the 30 minutes the client used to keep the PIN in localStorage. */
+export const ADMIN_TTL_MS = 30 * 60_000;
+
+/* The admin key mixes in the PIN itself, so changing ADMIN_PIN invalidates
+   every outstanding admin cookie without needing anything else rotated. */
+function adminKey(): string {
+  try {
+    return signingKey() + ':' + config.ADMIN_PIN;
+  } catch {
+    return '';
+  }
+}
+
+/** Called after a PIN has already been checked — never on its own. */
+export function createAdminToken(): string {
+  const key = adminKey();
+  if (!key) throw new Error('Cannot sign an admin session: no key available');
+
+  const payload = b64url(`admin.${Date.now() + ADMIN_TTL_MS}`);
+  return `${payload}.${sign(payload, key)}`;
+}
+
+/** True when this request carries a live admin cookie this server issued. */
+export function readAdminSession(request: Request | undefined): boolean {
+  const key = adminKey();
+  if (!key) return false;
+
+  const token = readCookie(request, ADMIN_COOKIE);
+  if (!token) return false;
+
+  const [payload, signature] = token.split('.');
+  if (!payload || !signature) return false;
+
+  const expected = sign(payload, key);
+  const a = Buffer.from(signature);
+  const b = Buffer.from(expected);
+  if (a.length !== b.length || !timingSafeEqual(a, b)) return false;
+
+  const decoded = unb64url(payload).toString('utf8');
+  if (!decoded.startsWith('admin.')) return false;
+
+  const expiresAt = Number(decoded.slice('admin.'.length));
+  return Number.isFinite(expiresAt) && Date.now() <= expiresAt;
+}
+
+/** Serialised Set-Cookie value; `maxAge` 0 clears it. */
+export function adminCookieHeader(token: string, maxAgeSeconds: number, secure: boolean): string {
+  const bits = [
+    `${ADMIN_COOKIE}=${token}`,
+    'Path=/',
+    'HttpOnly',
+    'SameSite=Lax',
+    `Max-Age=${maxAgeSeconds}`,
+  ];
+  if (secure) bits.push('Secure');
+  return bits.join('; ');
+}
+
 /** Reads a cookie without pulling in a parser — the header is a flat list. */
 function readCookie(request: Request | undefined, name: string): string | null {
   const raw = request?.headers.get('cookie');

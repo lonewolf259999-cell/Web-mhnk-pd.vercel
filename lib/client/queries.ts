@@ -37,8 +37,15 @@ export const queries = {
 export const mutations = {
   refresh: (pin: string) => unwrap(client.api.refresh.post({ pin })),
 
-  /** Is this the admin PIN? Answers without performing an admin action. */
+  /** Is this the admin PIN? Answers without performing an admin action.
+      On success the server also sets the HttpOnly admin cookie. */
   verifyPin: (pin: string) => unwrap(client.api.pin.verify.post({ pin })),
+
+  /** Is the admin cookie still live? Costs no PIN attempt. */
+  adminSession: () => unwrap(client.api.pin.session.get()),
+
+  /** Ends the admin session — only the server can clear an HttpOnly cookie. */
+  adminLogout: () => unwrap(client.api.pin.logout.post()),
 
   markPaid: (
     input: { pin: string; weekName: string; officerName: string; idempotencyKey?: string },

@@ -16,7 +16,7 @@ import { PinModal } from '@/components/ui/Modal';
 import { useApi } from '@/lib/client/api';
 import { queries } from '@/lib/client/queries';
 import { filterByQuery } from '@/lib/format';
-import { clearPin, isAdminMode, savePin, verifyStoredPin } from '@/lib/client/adminPin';
+import { clearPin, isAdminMode, openAdminSession, verifyStoredPin } from '@/lib/client/adminPin';
 import './home.css';
 
 export default function HomePage() {
@@ -202,8 +202,8 @@ export default function HomePage() {
               : 'กรุณาระบุรหัสผ่านเพื่อเข้าโหมดผู้ดูแล'
           }
           onCancel={() => setPinPrompt(null)}
-          onSubmit={(pin) => {
-            savePin(pin);
+          onSubmit={() => {
+            openAdminSession();
             const mode = pinPrompt;
             setPinPrompt(null);
             setAdminMode(true);

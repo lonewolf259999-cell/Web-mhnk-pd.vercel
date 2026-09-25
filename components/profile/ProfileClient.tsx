@@ -5,7 +5,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { queries, mutations } from '@/lib/client/queries';
 import { clearApiCache } from '@/lib/client/api';
-import { clearPin, isAdminMode, readPin, savePin, verifyStoredPin } from '@/lib/client/adminPin';
+import { clearPin, isAdminMode, openAdminSession, readPin, verifyStoredPin } from '@/lib/client/adminPin';
 import { findOfficerWeekData, isOfficerMatch } from '@/lib/format';
 import { SiteFooter } from '@/components/SiteHeader';
 import { ConfirmModal, CopyButton, PinModal } from '@/components/ui/Modal';
@@ -559,8 +559,8 @@ export function ProfileClient() {
               : 'กรุณาระบุรหัสผ่านเพื่อยืนยันการจ่าย'
           }
           onCancel={() => setPinPrompt(null)}
-          onSubmit={(pin) => {
-            savePin(pin);
+          onSubmit={() => {
+            openAdminSession();
             const mode = pinPrompt;
             setPinPrompt(null);
             if (mode === 'admin') setAdminMode(true);

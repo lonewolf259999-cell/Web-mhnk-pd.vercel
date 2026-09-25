@@ -5,7 +5,7 @@ import { useEffect, useState } from 'react';
 import { SiteFooter, SiteHeader } from '@/components/SiteHeader';
 import { PinField, PIN_LENGTH } from '@/components/ui/PinField';
 import { usePinCheck } from '@/components/ui/Modal';
-import { clearPin, isAdminMode, savePin, verifyStoredPin } from '@/lib/client/adminPin';
+import { clearPin, isAdminMode, openAdminSession, verifyStoredPin } from '@/lib/client/adminPin';
 
 /** 'checking' exists so a remembered PIN never flashes the lock screen. */
 type Gate = 'checking' | 'locked' | 'open';
@@ -88,8 +88,8 @@ export function PoliceHub() {
 }
 
 function PinGate({ checking, onUnlock }: { checking: boolean; onUnlock: () => void }) {
-  const pinCheck = usePinCheck((pin) => {
-    savePin(pin);
+  const pinCheck = usePinCheck(() => {
+    openAdminSession();
     onUnlock();
   });
 

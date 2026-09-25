@@ -1,6 +1,7 @@
 import { timingSafeEqual } from 'node:crypto';
 import { config } from './config';
 import { clientKey } from './rateLimit';
+import { readAdminSession } from './services/session';
 
 export class ApiError extends Error {
   constructor(
@@ -38,8 +39,17 @@ function sweepPinAttempts(now: number): void {
 }
 
 /** Admin PIN check. Rejects everything when no PIN is configured, and locks
-    out a client (best-effort, per-instance) after repeated wrong PINs. */
+    out a client (best-effort, per-instance) after repeated wrong PINs.
+
+    An admin cookie this server signed is accepted in place of the PIN. That
+    is what lets the browser stop keeping the PIN itself in localStorage,
+    where any script on the page could read it — the cookie is HttpOnly, is
+    only valid for 30 minutes, and dies the moment ADMIN_PIN changes. The PIN
+    in the body still works, so a client without a cookie simply asks for it
+    again rather than being locked out. */
 export function requirePin(body: unknown, request?: Request): void {
+  if (readAdminSession(request)) return;
+
   const pin = (body as { pin?: unknown } | null)?.pin;
   const key = clientKey(request, 'pin');
 
