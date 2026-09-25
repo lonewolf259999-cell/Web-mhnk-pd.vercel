@@ -363,7 +363,7 @@ export function ProfileClient() {
 
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
-          src="/logo.gif"
+          src="/logo.webp"
           alt="MHNK PD Logo"
           width={72}
           height={72}

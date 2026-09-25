@@ -1,6 +1,6 @@
 'use client';
 
-export const PAGES = [
+const PAGES = [
   { id: 'roster', icon: '⚖', label: 'รายชื่อ' },
   { id: 'cases', icon: '⚖', label: 'การทำคดี' },
   { id: 'conduct', icon: '📚', label: 'ข้อปฏิบัติ' },

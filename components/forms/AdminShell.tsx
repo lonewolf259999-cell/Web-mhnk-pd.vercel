@@ -13,7 +13,7 @@ import { DiscordIcon } from './DiscordIcon';
 
 export type ToastKind = 'success' | 'error';
 
-export interface ToastState {
+interface ToastState {
   message: string;
   kind: ToastKind;
 }

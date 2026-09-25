@@ -24,11 +24,17 @@ export const config = {
 
   CASES_DATA_SHEET_ID:
     process.env.CASES_DATA_SHEET_ID || '1grpNtG3sa9UoSwmTU3tY7-FOZQEHcMvL-Vu_1ipULlI',
+
+  /* Both fall back to SHEET_ID, but through the getter above rather than
+     process.env directly: an empty string here reaches Google as a request
+     for the spreadsheet named "", which comes back as a 404 that says
+     nothing about what is actually wrong. Going through required() names
+     the missing variable instead. */
   get PENDING_SPREADSHEET_ID() {
-    return process.env.PENDING_SPREADSHEET_ID || process.env.SHEET_ID || '';
+    return process.env.PENDING_SPREADSHEET_ID || this.SHEET_ID;
   },
   get ROSTER_SHEET_ID() {
-    return process.env.ROSTER_SHEET_ID || process.env.SHEET_ID || '';
+    return process.env.ROSTER_SHEET_ID || this.SHEET_ID;
   },
 
   SHEET_NAME: 'NamePD',

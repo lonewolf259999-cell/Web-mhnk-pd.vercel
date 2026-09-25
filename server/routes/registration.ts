@@ -10,11 +10,34 @@ import {
 import { addPendingRegistration, updatePendingRegistration } from '@/server/services/pending';
 import { ApiError } from '@/server/errors';
 import { clientKey, rateLimit } from '@/server/rateLimit';
+import { readSessionUserId } from '@/server/services/session';
 
 /* v2 rate-limited /api/register (10/min) but not /api/medical — applied
    consistently here to both submission endpoints. */
 const SUBMIT_LIMIT = 10;
 const SUBMIT_WINDOW_MS = 60_000;
+
+/* Reading and editing an existing application are cheap for the caller and
+   expensive for us (each one round-trips to Discord), so they get their own,
+   tighter budget than a fresh submission. */
+const EDIT_LIMIT = 20;
+const EDIT_WINDOW_MS = 60_000;
+
+/**
+ * The Discord id this request is actually authenticated as.
+ *
+ * Deliberately ignores any id in the body or query: those are whatever the
+ * client typed, and the id of the person a message belongs to is visible to
+ * anyone who can read the embed in Discord. Only the signed session cookie
+ * set by the OAuth callback counts.
+ */
+function requireDiscordUser(request: Request | undefined): string {
+  const userId = readSessionUserId(request);
+  if (!userId) {
+    throw new ApiError('กรุณาเชื่อมต่อ Discord ก่อน (เซสชันหมดอายุหรือยังไม่ได้เข้าสู่ระบบ)', 401);
+  }
+  return userId;
+}
 
 /* Elysia validates shape; these check the business rules the v2 controller
    enforced and return every problem at once, as the forms expect. */
@@ -77,6 +100,11 @@ function validateMedical(data: {
 function reject(errors: string[]): never {
   throw new ApiError(errors.join(' • '), 400);
 }
+
+/* `discordUserId` is still accepted on these schemas but no longer read:
+   browsers holding a cached bundle keep sending it, and rejecting it would
+   break them for no gain. Authorisation comes from requireDiscordUser() —
+   do not reintroduce a client-supplied id as an identity. */
 
 const policeBody = t.Object({
   ocName: t.String(),
@@ -147,7 +175,10 @@ export const registrationRoutes = new Elysia({ name: 'registration' })
 
   .patch(
     '/register/edit',
-    async ({ body }) => {
+    async ({ body, request }) => {
+      rateLimit(clientKey(request, 'edit'), EDIT_LIMIT, EDIT_WINDOW_MS);
+      const verifiedUserId = requireDiscordUser(request);
+
       if (!body.messageId) throw new ApiError('กรุณาระบุ Message ID', 400);
       if (!body.discordId) throw new ApiError('กรุณาเชื่อมต่อ Discord ก่อนแก้ไขข้อมูล', 400);
 
@@ -167,7 +198,7 @@ export const registrationRoutes = new Elysia({ name: 'registration' })
           steamUrl: body.steamUrl.trim(),
         },
         editCount,
-        body.discordUserId
+        verifiedUserId
       );
 
       try {
@@ -193,8 +224,9 @@ export const registrationRoutes = new Elysia({ name: 'registration' })
 
   .get(
     '/register/fetch/:messageId',
-    async ({ params, query }) => {
-      const result = await fetchRegistration(params.messageId, query.discordUserId);
+    async ({ params, request }) => {
+      rateLimit(clientKey(request, 'edit'), EDIT_LIMIT, EDIT_WINDOW_MS);
+      const result = await fetchRegistration(params.messageId, requireDiscordUser(request));
       return { success: true, ...result };
     },
     {
@@ -233,7 +265,10 @@ export const registrationRoutes = new Elysia({ name: 'registration' })
 
   .patch(
     '/medical/edit',
-    async ({ body }) => {
+    async ({ body, request }) => {
+      rateLimit(clientKey(request, 'edit'), EDIT_LIMIT, EDIT_WINDOW_MS);
+      const verifiedUserId = requireDiscordUser(request);
+
       if (!body.messageId) throw new ApiError('กรุณาระบุ Message ID', 400);
       if (!body.discordId) throw new ApiError('กรุณาเชื่อมต่อ Discord ก่อนแก้ไขข้อมูล', 400);
 
@@ -254,7 +289,7 @@ export const registrationRoutes = new Elysia({ name: 'registration' })
           discordId: body.discordId.trim(),
         },
         editCount,
-        body.discordUserId
+        verifiedUserId
       );
 
       return { success: true, message: 'แก้ไขข้อมูลสำเร็จ! Embed ใน Discord อัปเดตแล้ว', editCount };
@@ -269,8 +304,9 @@ export const registrationRoutes = new Elysia({ name: 'registration' })
 
   .get(
     '/medical/fetch/:messageId',
-    async ({ params, query }) => {
-      const result = await fetchMedical(params.messageId, query.discordUserId);
+    async ({ params, request }) => {
+      rateLimit(clientKey(request, 'edit'), EDIT_LIMIT, EDIT_WINDOW_MS);
+      const result = await fetchMedical(params.messageId, requireDiscordUser(request));
       return { success: true, ...result };
     },
     {

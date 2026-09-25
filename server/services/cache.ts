@@ -12,7 +12,7 @@ interface Entry {
 const store = new Map<string, Entry>();
 const MAX_KEYS = 100;
 
-export function getCached<T>(key: string): T | null {
+function getCached<T>(key: string): T | null {
   const entry = store.get(key);
   if (entry && Date.now() - entry.timestamp < config.CACHE_TTL) {
     return entry.data as T;
@@ -20,7 +20,7 @@ export function getCached<T>(key: string): T | null {
   return null;
 }
 
-export function setCached(key: string, data: unknown): void {
+function setCached(key: string, data: unknown): void {
   if (store.size > MAX_KEYS) store.clear();
   store.set(key, { data, timestamp: Date.now() });
 }

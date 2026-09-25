@@ -25,7 +25,7 @@ export function clearApiCache(prefix?: string): void {
   }
 }
 
-export interface AsyncState<T> {
+interface AsyncState<T> {
   data: T | null;
   error: string | null;
   loading: boolean;

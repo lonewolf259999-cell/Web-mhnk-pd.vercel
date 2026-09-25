@@ -7,7 +7,7 @@ import { config } from '@/server/config';
  * character for character. A trailing slash on APP_URL would otherwise
  * produce a double slash here and Discord would reject every login.
  */
-export function redirectUri(): string {
+function redirectUri(): string {
   return `${config.APP_URL.replace(/\/+$/, '')}/auth/discord/callback`;
 }
 

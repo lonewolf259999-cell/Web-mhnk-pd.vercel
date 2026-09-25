@@ -26,7 +26,7 @@ interface DiscordMessage {
   embeds?: Embed[];
 }
 
-export interface RegistrationData {
+interface RegistrationData {
   ocName: string;
   icName: string;
   ocAge: number;
@@ -35,7 +35,7 @@ export interface RegistrationData {
   steamUrl: string;
 }
 
-export interface MedicalData {
+interface MedicalData {
   icName: string;
   ocAge: number;
   timeStart: string;
@@ -223,19 +223,19 @@ export async function editRegistration(
   messageId: string,
   data: RegistrationData,
   editCount: number,
-  verifiedUserId?: string | null
+  verifiedUserId: string
 ): Promise<void> {
   const url = requireWebhook(config.DISCORD_REGISTER_WEBHOOK_URL, 'การสมัคร');
-  if (verifiedUserId) await verifyOwnership(url, messageId, verifiedUserId);
+  await verifyOwnership(url, messageId, verifiedUserId);
 
   const { embed, content } = registrationEmbed(data, editCount);
   await discordRequest(editUrl(url, messageId), 'PATCH', { content, embeds: [embed] });
 }
 
-export async function fetchRegistration(messageId: string, verifiedUserId?: string | null) {
+export async function fetchRegistration(messageId: string, verifiedUserId: string) {
   const url = requireWebhook(config.DISCORD_REGISTER_WEBHOOK_URL, 'การสมัคร');
   const embed = await loadEmbed(url, messageId);
-  if (verifiedUserId) await verifyOwnership(url, messageId, verifiedUserId);
+  await verifyOwnership(url, messageId, verifiedUserId);
 
   const read = fieldReader(embed.fields || []);
 
@@ -270,19 +270,19 @@ export async function editMedical(
   messageId: string,
   data: MedicalData,
   editCount: number,
-  verifiedUserId?: string | null
+  verifiedUserId: string
 ): Promise<void> {
   const url = requireWebhook(config.DISCORD_MEDICAL_WEBHOOK_URL, 'การสมัครแพทย์');
-  if (verifiedUserId) await verifyOwnership(url, messageId, verifiedUserId);
+  await verifyOwnership(url, messageId, verifiedUserId);
 
   const { embed, content } = medicalEmbed(data, editCount);
   await discordRequest(editUrl(url, messageId), 'PATCH', { content, embeds: [embed] });
 }
 
-export async function fetchMedical(messageId: string, verifiedUserId?: string | null) {
+export async function fetchMedical(messageId: string, verifiedUserId: string) {
   const url = requireWebhook(config.DISCORD_MEDICAL_WEBHOOK_URL, 'การสมัครแพทย์');
   const embed = await loadEmbed(url, messageId);
-  if (verifiedUserId) await verifyOwnership(url, messageId, verifiedUserId);
+  await verifyOwnership(url, messageId, verifiedUserId);
 
   const fields = embed.fields || [];
   const read = fieldReader(fields, true);

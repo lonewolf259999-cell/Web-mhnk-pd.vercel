@@ -6,7 +6,7 @@ import { getSheets } from './googleAuth';
 
 const STATUS_PENDING = 'รอตรวจ';
 
-export interface PendingRow {
+interface PendingRow {
   [key: string]: string | number;
   _row: number;
 }

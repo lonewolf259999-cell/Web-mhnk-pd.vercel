@@ -1,4 +1,4 @@
-export type WeekState = 'loading' | 'paid' | 'owed' | 'unpaid-zero' | 'error';
+type WeekState = 'loading' | 'paid' | 'owed' | 'unpaid-zero' | 'error';
 
 export interface WeekStatus {
   state: WeekState;

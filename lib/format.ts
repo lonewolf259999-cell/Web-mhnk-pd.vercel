@@ -27,7 +27,7 @@ export function getInitials(name: string, code?: string): string {
   return (parts[0].charAt(0) + parts[parts.length - 1].charAt(0)).toUpperCase();
 }
 
-export type RankLevel = 'high' | 'medium' | 'low';
+type RankLevel = 'high' | 'medium' | 'low';
 
 const HIGH_RANKS = ['ผู้บัญชาการ', 'รองผู้บัญชาการ', 'พล.ต.อ.', 'พล.ต.ท.', 'พล.ต.ต.'];
 const LOW_RANKS = ['ส.ต.ต.', 'ส.ต.ท.', 'ส.ต.อ.', 'ด.ต.', 'น.ร.', 'น.ต.'];
@@ -52,7 +52,7 @@ export function groupByCategory<T>(
   return grouped;
 }
 
-export function normalizeName(text: string | undefined): string {
+function normalizeName(text: string | undefined): string {
   return String(text || '')
     .trim()
     .replace(/\s+/g, ' ')

@@ -5,7 +5,7 @@ import { getInitials, getRankLevel, parseCases } from '@/lib/format';
 import type { Officer } from '@/lib/types';
 
 /** Rank pill. The level decides the colour (v2's .rank-high / -medium / -low). */
-export function RankBadge({ rank }: { rank: string }) {
+function RankBadge({ rank }: { rank: string }) {
   return <span className={`rank-badge rank-${getRankLevel(rank)}`}>{rank || '—'}</span>;
 }
 

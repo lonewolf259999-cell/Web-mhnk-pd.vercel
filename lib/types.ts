@@ -29,7 +29,7 @@ export interface WeekOfficerData {
 
 export type WeekData = Record<string, WeekOfficerData>;
 
-export interface Top10Entry {
+interface Top10Entry {
   name: string;
   rank: string;
   totalCases: number;
@@ -69,7 +69,7 @@ export interface CaseItem {
 
 export type RulesType = 'conduct' | 'rules' | 'fines';
 
-export interface ScheduleDay {
+interface ScheduleDay {
   key: string;
   label: string;
   short: string;

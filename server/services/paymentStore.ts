@@ -6,7 +6,7 @@
 
 const TTL = 10 * 60 * 1000;
 
-export interface PaymentRecord {
+interface PaymentRecord {
   status?: 'processing';
   success?: boolean;
   message?: string;
