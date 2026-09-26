@@ -65,19 +65,26 @@ Large read-only sheets come through Google's GViz CSV export; writes and the rul
 
 `/register` and `/medical` are both rate-limited (10/min per client) via the same `rateLimit()` helper — apply the same call to any new public submission endpoint.
 
-### /rostermanage authorises on a Discord allowlist, not the PIN
+### The two admin consoles authorise on a Discord allowlist, not the PIN
 
-`server/services/permissions.ts` gates that page instead: the verified Discord id from the session cookie has to appear in a list the spreadsheet holds at **`NamePD!AA2`** (the literal key `ROSTERMANAGE_IDDC`) and **`AB2`** (the ids, any separator, `<@id>` tolerated). `requirePermission` returns the actor's id, so a write can be attributed — the thing one shared PIN never could.
+`server/services/permissions.ts` gates both instead: the verified Discord id from the session cookie has to appear in a list the spreadsheet holds in two cells — the left one naming the list, the right one holding the ids (any separator, `<@id>` tolerated).
+
+| page | routes | key cell | ids cell | key |
+|---|---|---|---|---|
+| `/rostermanage` | `routes/rosterAdmin.ts` | `NamePD!AA2` | `AB2` | `ROSTERMANAGE_IDDC` |
+| `/proctor` | `routes/pending.ts` | `Pending!I1` | `J1` | `PROCTOR_IDDC` |
+
+Adding a third console means adding a `PermissionSource`, not a second reader. `requirePermission` returns the actor's id, so a write can be attributed — the thing one shared PIN never could, and what `/pending/approve` now records as the proctor instead of believing an id sent in the body.
 
 Consequences worth knowing before changing it:
 
 - **The list is not a credential.** An id only works for whoever can log into that Discord account, which is why it is safe in a sheet other people can read. `ADMIN_PIN` would not be — never move it there.
 - Read through the Sheets API, not GViz: the GViz export is CDN-cached, so a revoked id would keep working for minutes.
 - Those two cells are positional like the rest of the sheet layer, so the key cell is **verified** rather than assumed. An inserted row reports itself instead of silently reading whatever slid into AA2.
-- `ROSTERMANAGE_IDDC` in the environment is a standby list, merged in on every path including the failure ones. It is what stops a mistyped cell from locking the last admin out of the page that edits that cell. It does not help if Discord OAuth itself breaks — nothing short of a non-Discord gate would.
-- The page asks `GET /roster/access` on load because the session cookie is HttpOnly. Without that call a refresh looks like a logout.
+- `ROSTERMANAGE_IDDC` and `PROCTOR_IDDC` in the environment are standby lists, merged in on every path including the failure ones. They are what stops a mistyped cell from locking the last admin out of the page that edits that cell. They do not help if Discord OAuth itself breaks — nothing short of a non-Discord gate would.
+- Each page asks its `access` endpoint on load because the session cookie is HttpOnly. Without that call a refresh looks like a logout.
 
-`/proctor` still uses `requirePin`; its routes were moved to `server/routes/pending.ts` so the two consoles no longer share a module. Its own list is meant to land at `Pending!I1:J1` under the key `PROCTOR_IDDC` — add a second `PermissionSource` for it rather than a second reader.
+`ADMIN_PIN` still guards `/refresh`, `/mark-paid` and the rules/fines/conduct CRUD, so `requirePin` and the admin cookie are still live — they are simply no longer what stands between anyone and the roster.
 
 ### Google Sheets lags its own writes
 

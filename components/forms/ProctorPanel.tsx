@@ -1,16 +1,11 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { mutations } from '@/lib/client/queries';
 import { useDiscordAuth } from '@/lib/client/useDiscordAuth';
 import { CopyInline } from '@/components/ui/CopyInline';
-import {
-  AdminLoginBox,
-  DebugLog,
-  PageToast,
-  useDebugLog,
-  useToastState,
-} from './AdminShell';
+import { DebugLog, PageToast, useDebugLog, useToastState } from './AdminShell';
+import { DiscordGate, type GateState } from './DiscordGate';
 
 /* Column headers come from the Pending sheet, so they are Thai strings. */
 const COL = {
@@ -45,10 +40,8 @@ export function ProctorPanel() {
   const [toast, showToast] = useToastState();
   const [logText, log] = useDebugLog();
 
-  /* The PIN is never persisted: it is a shared admin secret, and v2 kept it in
-     a page variable that dies with the tab. */
-  const [pin, setPin] = useState('');
-  const [sessionPin, setSessionPin] = useState('');
+  const [gate, setGate] = useState<GateState | null>(null);
+  const [checking, setChecking] = useState(true);
   const [rows, setRows] = useState<Row[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -57,37 +50,76 @@ export function ProctorPanel() {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
 
-  async function loadData(withPin: string) {
+  /* Whether this browser is signed in, and whether that account is on the
+     allowlist in the sheet — neither of which the page can tell by looking,
+     since the Discord session is an HttpOnly cookie. Asking on load is also
+     what makes a refresh survive: the OAuth params in the URL are stripped by
+     then, the cookie is not. */
+  const refreshAccess = useCallback(async (): Promise<GateState> => {
+    try {
+      const result = await mutations.proctorAccess();
+      setGate(result);
+      return result;
+    } catch (err) {
+      // An unanswered question is not a yes.
+      const denied: GateState = { userId: null, allowed: false, problem: '' };
+      setGate(denied);
+      log(`Error: ${(err as Error).message}`);
+      return denied;
+    } finally {
+      setChecking(false);
+    }
+  }, [log]);
+
+  const loadData = useCallback(async () => {
     setBusy(true);
     setReloading(true);
     try {
-      const result = await mutations.listPending(withPin);
+      const result = await mutations.listPending();
       const data = result.data as Row[];
       setRows(data);
-      setSessionPin(withPin);
       setLoaded(true);
       log(`โหลดข้อมูล ${data.length} รายการ`);
     } catch (err) {
       const message = (err as Error).message;
-      showToast(message || 'PIN ไม่ถูกต้อง', 'error');
+      showToast(message || 'โหลดข้อมูลไม่สำเร็จ', 'error');
       log(`Error: ${message}`);
+
+      /* Access can be taken away while the page is open — the list is re-read
+         on every request. Drop back to the gate so it says why, rather than
+         leaving a dead table on screen. */
+      if (/สิทธิ์|Discord/.test(message)) {
+        setLoaded(false);
+        void refreshAccess();
+      }
     } finally {
       setBusy(false);
       setReloading(false);
     }
-  }
+  }, [log, showToast, refreshAccess]);
 
-  function doLogin() {
-    if (!auth.user) {
-      showToast('กรุณาเชื่อมต่อ Discord ก่อน', 'error');
-      return;
+  useEffect(() => {
+    void refreshAccess();
+  }, [refreshAccess]);
+
+  /* On the list: straight into the table. With the PIN field gone there is no
+     second step left for the person to click. */
+  const allowed = gate?.allowed ?? false;
+  useEffect(() => {
+    if (allowed) void loadData();
+  }, [allowed, loadData]);
+
+  async function doLogout() {
+    try {
+      await mutations.discordLogout();
+    } catch {
+      /* the cookie expires on its own; nothing useful to show */
     }
-    const value = pin.trim();
-    if (!value) {
-      showToast('กรุณากรอก PIN', 'error');
-      return;
-    }
-    void loadData(value);
+    setGate({ userId: null, allowed: false, problem: '' });
+    setLoaded(false);
+    setRows([]);
+    auth.disconnect();
+    log('ออกจากระบบแล้ว');
   }
 
   const stats = useMemo(() => {
@@ -116,24 +148,18 @@ export function ProctorPanel() {
   }, [rows, search, statusFilter]);
 
   async function approve(row: number) {
-    if (!auth.user) {
-      showToast('กรุณาเชื่อมต่อ Discord ก่อนอนุมัติ', 'error');
-      return;
-    }
     const item = rows.find((r) => r._row === row);
     const discordId = String(item?.[COL.discordId] ?? '');
     if (!window.confirm(`อนุมัติผู้ใช้ Discord ID: ${discordId}?`)) return;
 
     setBusy(true);
     try {
-      await mutations.approvePending(row, {
-        pin: sessionPin,
-        proctorDiscordId: auth.user.userId,
-        proctorDiscordName: auth.user.name,
-      });
+      /* The proctor on the record is taken from the session server-side; there
+         is nothing to send and nothing here that could name someone else. */
+      await mutations.approvePending(row);
       showToast(`✔ อนุมัติ ${discordId} เรียบร้อย`);
-      log(`อนุมัติ แถว ${row} (${discordId}) โดย proctor ${auth.user.userId}`);
-      await loadData(sessionPin);
+      log(`อนุมัติ แถว ${row} (${discordId}) โดย proctor ${gate?.userId ?? ''}`);
+      await loadData();
     } catch (err) {
       showToast((err as Error).message || 'เกิดข้อผิดพลาด', 'error');
     } finally {
@@ -142,20 +168,16 @@ export function ProctorPanel() {
   }
 
   async function reject(row: number) {
-    if (!auth.user) {
-      showToast('กรุณาเชื่อมต่อ Discord ก่อนปฏิเสธ', 'error');
-      return;
-    }
     const item = rows.find((r) => r._row === row);
     const discordId = String(item?.[COL.discordId] ?? '');
     if (!window.confirm(`ปฏิเสธผู้ใช้ Discord ID: ${discordId}?`)) return;
 
     setBusy(true);
     try {
-      await mutations.rejectPending(row, sessionPin);
+      await mutations.rejectPending(row);
       showToast(`ปฏิเสธ ${discordId} เรียบร้อย`);
       log(`ปฏิเสธ แถว ${row} (${discordId})`);
-      await loadData(sessionPin);
+      await loadData();
     } catch (err) {
       showToast((err as Error).message || 'เกิดข้อผิดพลาด', 'error');
     } finally {
@@ -172,13 +194,26 @@ export function ProctorPanel() {
         <PageToast toast={toast} />
 
         {!loaded ? (
-          <AdminLoginBox
-            auth={auth}
-            pin={pin}
-            onPinChange={setPin}
-            onSubmit={doLogin}
-            busy={busy}
-          />
+          /* Allowed but not loaded yet is the gap between the access answer and
+             the first fetch — showing the gate there would flash "no access" at
+             someone who has it. */
+          allowed ? (
+            <div className="login-box">
+              <div className="loading">กำลังโหลดข้อมูล</div>
+            </div>
+          ) : (
+            <DiscordGate
+              loginUrl={auth.loginUrl}
+              checking={checking}
+              gate={gate}
+              failed={auth.failed}
+              displayName={auth.user?.name ?? ''}
+              avatarUrl={auth.avatarUrl}
+              sheetName="Pending"
+              cellName="J1"
+              onLogout={() => void doLogout()}
+            />
+          )
         ) : (
           <div>
             <div className="stats">
@@ -230,7 +265,7 @@ export function ProctorPanel() {
                 <button
                   type="button"
                   className="btn-secondary btn-sm"
-                  onClick={() => void loadData(sessionPin)}
+                  onClick={() => void loadData()}
                   disabled={busy}
                 >
                   🔄 โหลดใหม่

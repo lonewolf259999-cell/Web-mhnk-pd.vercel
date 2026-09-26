@@ -1,15 +1,13 @@
 'use client';
 
-/* eslint-disable @next/next/no-img-element */
-
 /* Pieces shared by the two admin consoles (public/proctor.html and
    public/rostermanage.html). Their markup is identical; only the page
-   stylesheet and the PIN's destination differ. */
+   stylesheet differs.
 
-import Link from 'next/link';
+   The login box that used to live here went with ADMIN_PIN: both consoles now
+   authorise on a Discord allowlist and share DiscordGate instead. */
+
 import { useCallback, useRef, useState } from 'react';
-import type { DiscordAuthState } from '@/lib/client/useDiscordAuth';
-import { DiscordIcon } from './DiscordIcon';
 
 export type ToastKind = 'success' | 'error';
 
@@ -65,99 +63,6 @@ export function DebugLog({ text }: { text: string }) {
         <summary>📋 Log การทำงาน (Debug)</summary>
         <pre>{text}</pre>
       </details>
-    </div>
-  );
-}
-
-function CloseIcon() {
-  return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
-      <path d="M18 6L6 18M6 6l12 12" />
-    </svg>
-  );
-}
-
-/**
- * Two-step gate: connect Discord, then enter the PIN. The PIN field stays
- * disabled until Discord is connected, which is what makes every approval
- * attributable to a named proctor.
- */
-export function AdminLoginBox({
-  auth,
-  pin,
-  onPinChange,
-  onSubmit,
-  busy,
-}: {
-  auth: DiscordAuthState;
-  pin: string;
-  onPinChange: (value: string) => void;
-  onSubmit: () => void;
-  busy: boolean;
-}) {
-  const connected = auth.user !== null;
-
-  return (
-    <div className="login-box">
-      <div className="dc-section">
-        <span className="dc-section-label">🔗 ขั้นตอนที่ 1: เชื่อมต่อ Discord</span>
-
-        {!connected && (
-          <Link
-            href={auth.loginUrl}
-            className="btn-discord"
-            style={{ width: '100%', justifyContent: 'center' }}
-          >
-            <DiscordIcon size={20} />
-            เชื่อมต่อ Discord
-          </Link>
-        )}
-
-        {connected && (
-          <div>
-            <div className="dc-user">
-              <img className="dc-avatar" src={auth.avatarUrl ?? ''} alt="" />
-              <div className="dc-info">
-                <span className="dc-name">@{auth.user!.name}</span>
-                <span className="dc-id">ID: {auth.user!.userId}</span>
-              </div>
-              <button
-                type="button"
-                className="dc-disconnect"
-                title="ยกเลิกการเชื่อมต่อ"
-                onClick={auth.disconnect}
-              >
-                <CloseIcon />
-              </button>
-            </div>
-            <div style={{ marginTop: 10, color: '#22c55e', fontSize: 13 }}>
-              ✅ เชื่อมต่อ Discord สำเร็จ
-            </div>
-          </div>
-        )}
-      </div>
-
-      <span className="dc-section-label">🔒 ขั้นตอนที่ 2: กรุณาใส่ PIN</span>
-      <input
-        type="password"
-        value={pin}
-        placeholder="Admin PIN"
-        disabled={!connected}
-        aria-label="Admin PIN"
-        onChange={(e) => onPinChange(e.target.value)}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter') onSubmit();
-        }}
-      />
-      <button
-        type="button"
-        className="btn-primary"
-        style={{ width: '100%' }}
-        disabled={!connected || busy}
-        onClick={onSubmit}
-      >
-        {busy ? 'กำลังเข้าสู่ระบบ' : 'เข้าสู่ระบบ'}
-      </button>
     </div>
   );
 }

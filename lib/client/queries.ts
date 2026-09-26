@@ -77,23 +77,23 @@ export const mutations = {
   fetchMedical: (messageId: string, discordUserId?: string) =>
     unwrap(client.api.medical.fetch({ messageId }).get({ query: { discordUserId } })),
 
-  /* ---- admin ---- */
+  /* ---- the two admin consoles ----
+     Both are gated by a Discord allowlist rather than a PIN, so nothing below
+     carries a credential: the signed session cookie rides along on its own and
+     the server matches it against the list in the sheet. The approving
+     proctor is read from that cookie too, not sent from here.
 
-  listPending: (pin: string) => unwrap(client.api.pending.post({ pin })),
+     Each console asks its access endpoint on load, because the cookie is
+     HttpOnly and the page cannot read it for itself. */
 
-  approvePending: (row: number, input: { pin: string; proctorDiscordId: string; proctorDiscordName?: string }) =>
-    unwrap(client.api.pending.approve({ row }).post(input)),
+  proctorAccess: () => unwrap(client.api.pending.access.get()),
 
-  rejectPending: (row: number, pin: string) =>
-    unwrap(client.api.pending.reject({ row }).post({ pin })),
+  listPending: () => unwrap(client.api.pending.post()),
 
-  /* ---- rostermanage: gated by the Discord allowlist, not a PIN ----
-     Nothing here carries a credential. The signed Discord session cookie rides
-     along automatically and the server matches it against the list in the
-     sheet, so there is no longer anything for the page to hold or to send. */
+  approvePending: (row: number) => unwrap(client.api.pending.approve({ row }).post()),
 
-  /** Am I signed in, and am I on the list? Asked on every page load, because
-      the session cookie is HttpOnly and the page cannot read it itself. */
+  rejectPending: (row: number) => unwrap(client.api.pending.reject({ row }).post()),
+
   rosterAccess: () => unwrap(client.api.roster.access.get()),
 
   namePD: () => unwrap(client.api.roster.namepd.post()),
