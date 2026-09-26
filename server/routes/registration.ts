@@ -48,6 +48,32 @@ function requireDiscordUser(request: Request | undefined): string {
   return userId;
 }
 
+/**
+ * Refuses a second application from an account that already has one the page
+ * can open for editing.
+ *
+ * Deliberately keyed on the stored message id, not on merely having a row: an
+ * application filed before that id was recorded cannot be found automatically,
+ * and blocking those would leave the applicant with no way through at all.
+ * Status is not consulted — an approved or rejected applicant edits the same
+ * application as anyone else, which is what was asked for.
+ */
+async function refuseDuplicate(
+  request: Request | undefined,
+  bodyDiscordId: string,
+  find: (id: string) => Promise<string | null>
+): Promise<void> {
+  const userId = readSessionUserId(request) || bodyDiscordId.trim();
+  if (!userId) return;
+
+  if (await find(userId)) {
+    throw new ApiError(
+      'บัญชี Discord นี้มีใบสมัครอยู่แล้ว — กรุณากดปุ่มแก้ไขข้อมูลเพื่อแก้ใบเดิม แทนการสมัครใหม่',
+      409
+    );
+  }
+}
+
 /* Elysia validates shape; these check the business rules the v2 controller
    enforced and return every problem at once, as the forms expect. */
 
@@ -147,6 +173,8 @@ export const registrationRoutes = new Elysia({ name: 'registration' })
       rateLimit(clientKey(request, 'submit'), SUBMIT_LIMIT, SUBMIT_WINDOW_MS);
       const errors = validatePolice(body);
       if (errors.length) reject(errors);
+
+      await refuseDuplicate(request, body.discordId, findPendingMessageId);
 
       const data = {
         ocName: body.ocName.trim(),
@@ -274,6 +302,8 @@ export const registrationRoutes = new Elysia({ name: 'registration' })
       rateLimit(clientKey(request, 'submit'), SUBMIT_LIMIT, SUBMIT_WINDOW_MS);
       const errors = validateMedical(body);
       if (errors.length) reject(errors);
+
+      await refuseDuplicate(request, body.discordId, findMedicalMessageId);
 
       const data = {
         icName: body.icName.trim(),

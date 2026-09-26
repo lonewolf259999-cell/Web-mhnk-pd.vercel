@@ -220,6 +220,7 @@ export function EditSection({
   onFetch,
   fetching,
   onCancel,
+  cancelLabel = 'ยกเลิก',
   lookup,
 }: {
   messageId: string;
@@ -227,6 +228,9 @@ export function EditSection({
   onFetch: () => void;
   fetching: boolean;
   onCancel: () => void;
+  /** Leaving the editor means different things depending on whether there is
+      an application to leave it to — see the forms. */
+  cancelLabel?: string;
   lookup?: EditLookup | null;
 }) {
   /* The id is only asked for when it could not be found automatically — which
@@ -244,7 +248,7 @@ export function EditSection({
           onClick={onCancel}
           className="ml-auto cursor-pointer rounded-sm border border-danger/30 bg-danger/15 px-3.5 py-1.5 text-xs font-semibold text-danger transition hover:bg-danger/30"
         >
-          ยกเลิก
+          {cancelLabel}
         </button>
       </div>
 

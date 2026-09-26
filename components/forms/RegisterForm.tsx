@@ -305,7 +305,16 @@ export function RegisterForm() {
                   onFetch={loadExisting}
                   fetching={fetching}
                   lookup={lookup}
+                  cancelLabel={lookup?.status === 'found' ? 'ล้างการแก้ไข' : 'ยกเลิก'}
                   onCancel={() => {
+                    /* With an application open there is nothing to leave the
+                       editor *to*: dropping out of it used to leave the form
+                       filled in and submittable, which filed a second one. So
+                       here it means "throw my changes away", and reloads. */
+                    if (lookup?.status === 'found') {
+                      void startEdit();
+                      return;
+                    }
                     setEditMode(false);
                     setLookup(null);
                     setErrors([]);

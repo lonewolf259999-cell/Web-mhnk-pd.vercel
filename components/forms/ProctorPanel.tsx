@@ -191,7 +191,7 @@ export function ProctorPanel() {
   return (
     <div className="proctor-page">
       <div className="container">
-        <h1>⚙️ Admin Panel</h1>
+        <h1>⚙️ Proctor</h1>
         <p className="subtitle">MHNK Police Department — ระบบตรวจสอบและอนุมัติใบสมัคร</p>
 
         <PageToast toast={toast} />

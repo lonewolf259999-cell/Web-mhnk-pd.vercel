@@ -434,7 +434,15 @@ export function MedicalForm() {
                     onFetch={loadExisting}
                     fetching={loadingText !== null}
                     lookup={lookup}
-                    onCancel={exitEditMode}
+                    cancelLabel={lookup?.status === 'found' ? 'ล้างการแก้ไข' : 'ยกเลิก'}
+                    onCancel={() => {
+                      // Same reasoning as the police form.
+                      if (lookup?.status === 'found') {
+                        void startEdit();
+                        return;
+                      }
+                      exitEditMode();
+                    }}
                   />
                 )}
 

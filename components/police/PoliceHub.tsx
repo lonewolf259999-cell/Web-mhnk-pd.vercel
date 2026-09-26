@@ -49,7 +49,7 @@ const GROUPS: { label: string; entries: Entry[] }[] = [
       {
         href: '/proctor',
         icon: '⚙️',
-        title: 'Admin Panel',
+        title: 'Proctor',
         description: 'ตรวจสอบและอนุมัติใบสมัครของผู้สมัคร',
       },
     ],
