@@ -1,10 +1,33 @@
-/* Pending registration sheet — columns A–H:
-   timestamp, discordId, discordName, icName, icPhone, ocAge, steamUrl, status */
+/* Pending registration sheet — columns A–I:
+   timestamp, discordId, discordName, icName, icPhone, ocAge, steamUrl, status,
+   and I: the id of the Discord message the submission created.
+
+   Column I is what lets someone edit an application without having kept that
+   id themselves — it is found from the Discord account they are signed in as.
+   Rows written before the column existed have it empty, which reads as "no
+   record" and sends the page back to asking for the id by hand.
+
+   The proctor listing still reads A:H on purpose. It maps by header name, so a
+   ninth column would put the message id in front of reviewers who have no use
+   for it. The permission cells sit further along that row again, at L1/M1 —
+   see services/permissions.ts. */
 
 import { config } from '@/server/config';
 import { getSheets } from './googleAuth';
+import { findLatestSubmission, type ApplicationSheet } from './applicationSheet';
 
 const STATUS_PENDING = 'รอตรวจ';
+
+const REGISTER_SHEET: ApplicationSheet = {
+  get spreadsheetId() {
+    return config.PENDING_SPREADSHEET_ID;
+  },
+  get sheetName() {
+    return config.PENDING_SHEET_NAME;
+  },
+  discordColumn: 'B',
+  messageColumn: 'I',
+};
 
 interface PendingRow {
   [key: string]: string | number;
@@ -18,12 +41,15 @@ export async function addPendingRegistration(data: {
   icPhone: string;
   ocAge: number;
   steamUrl: string;
+  /** Empty only if Discord somehow returned no id; the row is still worth
+      writing, it just cannot be found again without the id typed by hand. */
+  messageId?: string;
 }): Promise<void> {
   const timestamp = new Date().toLocaleString('th-TH', { timeZone: 'Asia/Bangkok' });
 
   await getSheets().spreadsheets.values.append({
     spreadsheetId: config.PENDING_SPREADSHEET_ID,
-    range: `${config.PENDING_SHEET_NAME}!A:H`,
+    range: `${config.PENDING_SHEET_NAME}!A:I`,
     valueInputOption: 'USER_ENTERED',
     requestBody: {
       values: [
@@ -36,6 +62,7 @@ export async function addPendingRegistration(data: {
           String(data.ocAge),
           data.steamUrl,
           STATUS_PENDING,
+          data.messageId ?? '',
         ],
       ],
     },
@@ -74,32 +101,29 @@ async function setStatus(rowNumber: number, status: string): Promise<void> {
 export const approvePending = (row: number) => setStatus(row, 'อนุมัติ');
 export const rejectPending = (row: number) => setStatus(row, 'ปฏิเสธ');
 
-/** Updates columns D–G for whichever row holds this Discord id. */
+/** The Discord message behind this account's latest application, or null when
+    there is no row for it or the row predates column I. */
+export async function findPendingMessageId(discordId: string): Promise<string | null> {
+  const found = await findLatestSubmission(REGISTER_SHEET, discordId);
+  return found?.messageId || null;
+}
+
+/** Updates columns D–G on whichever row holds this Discord id. */
 export async function updatePendingRegistration(
   discordId: string,
   data: { icName: string; icPhone: string; ocAge: number; steamUrl: string }
 ): Promise<void> {
-  const sheets = getSheets();
-  const response = await sheets.spreadsheets.values.get({
-    spreadsheetId: config.PENDING_SPREADSHEET_ID,
-    range: `${config.PENDING_SHEET_NAME}!A:H`,
-  });
-
-  const rows = response.data.values || [];
-
-  for (let i = 1; i < rows.length; i++) {
-    if (String(rows[i]?.[1] ?? '').trim() !== discordId) continue;
-
-    await sheets.spreadsheets.values.update({
-      spreadsheetId: config.PENDING_SPREADSHEET_ID,
-      range: `${config.PENDING_SHEET_NAME}!D${i + 1}:G${i + 1}`,
-      valueInputOption: 'USER_ENTERED',
-      requestBody: {
-        values: [[data.icName, data.icPhone, String(data.ocAge), data.steamUrl]],
-      },
-    });
-    return;
-  }
+  const found = await findLatestSubmission(REGISTER_SHEET, discordId);
 
   // Not found is expected once a registration has been approved and removed.
+  if (!found) return;
+
+  await getSheets().spreadsheets.values.update({
+    spreadsheetId: config.PENDING_SPREADSHEET_ID,
+    range: `${config.PENDING_SHEET_NAME}!D${found.row}:G${found.row}`,
+    valueInputOption: 'USER_ENTERED',
+    requestBody: {
+      values: [[data.icName, data.icPhone, String(data.ocAge), data.steamUrl]],
+    },
+  });
 }

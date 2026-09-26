@@ -72,7 +72,7 @@ Large read-only sheets come through Google's GViz CSV export; writes and the rul
 | page | routes | key cell | ids cell | key |
 |---|---|---|---|---|
 | `/rostermanage` | `routes/rosterAdmin.ts` | `NamePD!AA2` | `AB2` | `ROSTERMANAGE_IDDC` |
-| `/proctor` | `routes/pending.ts` | `Pending!I1` | `J1` | `PROCTOR_IDDC` |
+| `/proctor` | `routes/pending.ts` | `Pending!L1` | `M1` | `PROCTOR_IDDC` |
 
 Adding a third console means adding a `PermissionSource`, not a second reader. `requirePermission` returns the actor's id, so a write can be attributed — the thing one shared PIN never could, and what `/pending/approve` now records as the proctor instead of believing an id sent in the body.
 
@@ -81,10 +81,25 @@ Consequences worth knowing before changing it:
 - **The list is not a credential.** An id only works for whoever can log into that Discord account, which is why it is safe in a sheet other people can read. `ADMIN_PIN` would not be — never move it there.
 - Read through the Sheets API, not GViz: the GViz export is CDN-cached, so a revoked id would keep working for minutes.
 - Those two cells are positional like the rest of the sheet layer, so the key cell is **verified** rather than assumed. An inserted row reports itself instead of silently reading whatever slid into AA2.
+- Keep them clear of the data range. The proctor pair started at `I1/J1` and had to move to `L1/M1` the moment column I became a data column: a config cell inside the range arrives as a column header and ships the allowlist to the browser with every row.
+- The diagnostic in `problem` names the sheet and the cell, so it is returned **only alongside `allowed`** and logged server-side. A refused caller is told nothing about where the list lives.
 - `ROSTERMANAGE_IDDC` and `PROCTOR_IDDC` in the environment are standby lists, merged in on every path including the failure ones. They are what stops a mistyped cell from locking the last admin out of the page that edits that cell. They do not help if Discord OAuth itself breaks — nothing short of a non-Discord gate would.
 - Each page asks its `access` endpoint on load because the session cookie is HttpOnly. Without that call a refresh looks like a logout.
 
 `ADMIN_PIN` still guards `/refresh`, `/mark-paid` and the rules/fines/conduct CRUD, so `requirePin` and the admin cookie are still live — they are simply no longer what stands between anyone and the roster.
+
+### Editing an application does not need its Discord message id
+
+A submission's message id is written to `Pending!I` alongside the row, and `GET /register/mine` finds it from the Discord id in the session cookie. That is what lets someone edit an application they submitted on another device, or after losing the id the success screen told them to keep.
+
+`RegisterForm` calls it the moment Discord connects, not only when the edit button is pressed: finding an earlier application drops the page straight into editing it, which is what stops a second one being filed. Fourteen ids in the sheet already have more than one row. Status is deliberately not consulted — an approved or rejected applicant edits the same way anyone else does. Finding nothing is silent, because "no earlier application" is the normal case for a first-time applicant, not an error.
+
+- The lookup takes the applicant's **most recent** row. Fourteen Discord ids in the sheet already appear more than once, because a rejected applicant can apply again — and an edit belongs to the application they last sent. `updatePendingRegistration` matches the same way, which is a fix: it used to write to the oldest.
+- Rows written before column I existed have it empty. That reads as "not found" and the form falls back to asking for the id by hand, so nothing already submitted stops being editable — do not remove that field.
+- `fetchRegistration` still verifies ownership against the Discord message itself. A sheet row is a weaker claim than the message, and the check costs nothing on a request that was already going to load the embed.
+`/medical` works the same way against its own sheet, `Medical` (columns A–K, message id in K, row 1 headers), in the same spreadsheet. It has no review console yet: its status column is written on submit and read by nothing, so one can be added later without every column moving along.
+
+`services/applicationSheet.ts` holds the part both share — find this Discord id's most recent row, and the message id beside it. A third application form means another `ApplicationSheet` descriptor, not another copy of the loop.
 
 ### Google Sheets lags its own writes
 

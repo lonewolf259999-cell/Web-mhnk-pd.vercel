@@ -4,7 +4,7 @@
    copy, colours, fields and flow, expressed with this app's shared form
    pieces instead of hand-wired DOM. */
 
-import { useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { mutations } from '@/lib/client/queries';
 import { useDiscordAuth } from '@/lib/client/useDiscordAuth';
 import { SiteFooter, SiteHeader } from '@/components/SiteHeader';
@@ -12,6 +12,7 @@ import {
   DiscordConnectPanel,
   DiscordIdField,
   EditSection,
+  type EditLookup,
   EditToggle,
   ErrorBox,
   Field,
@@ -108,8 +109,12 @@ export function MedicalForm() {
   const [copied, setCopied] = useState(false);
 
   const [editMode, setEditMode] = useState(false);
+  const [lookup, setLookup] = useState<EditLookup | null>(null);
   const [messageId, setMessageId] = useState('');
   const [editCount, setEditCount] = useState(0);
+
+  /** Which account has already been looked up, so connecting does it once. */
+  const checkedFor = useRef<string | null>(null);
 
   const set =
     (key: keyof FormState) =>
@@ -134,8 +139,83 @@ export function MedicalForm() {
 
   function exitEditMode() {
     setEditMode(false);
+    setLookup(null);
     setMessageId('');
     setEditCount(0);
+  }
+
+  /** Drops a submission read back out of Discord into the form. */
+  const applyLoaded = useCallback(
+    (result: {
+      data: {
+        icName: string;
+        ocAge: number;
+        timeStart: string;
+        timeEnd: string;
+        medicalExperience: string;
+        joinReason: string;
+      };
+      editCount: number;
+      messageId: string;
+    }) => {
+      const [first = '', ...rest] = (result.data.icName || '').split(' ');
+
+      setForm({
+        icFirstName: first,
+        icLastName: rest.join(' '),
+        ocAge: result.data.ocAge ? String(result.data.ocAge) : '',
+        timeStart: result.data.timeStart,
+        timeEnd: result.data.timeEnd,
+        medicalExperience: result.data.medicalExperience,
+        joinReason: result.data.joinReason,
+      });
+      setEditCount(result.editCount);
+      setMessageId(result.messageId);
+    },
+    []
+  );
+
+  /**
+   * Connecting Discord finds an earlier application on its own, the same way
+   * the police form does. Finding nothing is silent — that is simply a first
+   * application, not an error.
+   */
+  useEffect(() => {
+    const userId = auth.user?.userId;
+    if (!userId || checkedFor.current === userId) return;
+    checkedFor.current = userId;
+
+    let alive = true;
+
+    mutations
+      .myMedical()
+      .then((result) => {
+        if (!alive) return;
+        applyLoaded(result);
+        setEditMode(true);
+        setLookup({ status: 'found', message: '' });
+      })
+      .catch(() => {
+        /* Nothing to edit; this is a new application. */
+      });
+
+    return () => {
+      alive = false;
+    };
+  }, [auth.user?.userId, applyLoaded]);
+
+  /** The edit button, for an application the lookup could not find. */
+  async function startEdit() {
+    setEditMode(true);
+    setNotice(null);
+    setLookup({ status: 'loading', message: '' });
+
+    try {
+      applyLoaded(await mutations.myMedical());
+      setLookup({ status: 'found', message: '' });
+    } catch (err) {
+      setLookup({ status: 'missing', message: (err as Error).message });
+    }
   }
 
   /** Pulls an existing submission back out of its Discord embed. */
@@ -207,6 +287,7 @@ export function MedicalForm() {
       joinReason: form.joinReason.trim(),
       discordId: auth.user.userId,
       discordUserId: auth.user.userId,
+      discordDisplayName: auth.user.name,
     };
 
     if (editMode) {
@@ -280,6 +361,7 @@ export function MedicalForm() {
       fillFrom(saved.data);
       setMessageId(saved.messageId);
       setEditCount(saved.editCount);
+      setLookup({ status: 'found', message: '' });
     }
   }
 
@@ -343,7 +425,7 @@ export function MedicalForm() {
               <form onSubmit={submit} className="flex flex-col gap-6">
                 <DiscordIdField userId={auth.user?.userId ?? ''} />
 
-                <EditToggle editMode={editMode} onToggle={() => setEditMode(true)} />
+                <EditToggle editMode={editMode} onToggle={() => void startEdit()} />
 
                 {editMode && (
                   <EditSection
@@ -351,6 +433,7 @@ export function MedicalForm() {
                     onMessageIdChange={setMessageId}
                     onFetch={loadExisting}
                     fetching={loadingText !== null}
+                    lookup={lookup}
                     onCancel={exitEditMode}
                   />
                 )}

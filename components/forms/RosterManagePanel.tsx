@@ -48,6 +48,7 @@ export function RosterManagePanel() {
   const [gate, setGate] = useState<GateState | null>(null);
   const [checking, setChecking] = useState(true);
   const [loaded, setLoaded] = useState(false);
+  const [loadError, setLoadError] = useState('');
   const [busy, setBusy] = useState(false);
   const [reloading, setReloading] = useState(false);
 
@@ -87,6 +88,7 @@ export function RosterManagePanel() {
   const loadData = useCallback(async () => {
     setBusy(true);
     setReloading(true);
+    setLoadError('');
     try {
       const [inSystem, departed] = await Promise.all([mutations.namePD(), mutations.outDC()]);
       const current = inSystem.data as RosterMember[];
@@ -100,6 +102,7 @@ export function RosterManagePanel() {
       const message = (err as Error).message;
       showToast(message || 'โหลดข้อมูลไม่สำเร็จ', 'error');
       log(`Error: ${message}`);
+      setLoadError(message || 'โหลดข้อมูลไม่สำเร็จ');
 
       /* Access can be taken away while the page is open — the list is re-read
          on every request. Rather than leaving a dead table on screen, drop back
@@ -287,7 +290,26 @@ export function RosterManagePanel() {
              someone who has it. */
           allowed ? (
             <div className="login-box">
-              <div className="loading">กำลังโหลดข้อมูล…</div>
+              {loadError ? (
+                <div>
+                  <div style={{ color: '#ef4444', marginBottom: 6 }}>❌ {loadError}</div>
+                  {gate?.problem && (
+                    <div className="config-warning" style={{ textAlign: 'left' }}>
+                      ⚠️ {gate.problem}
+                    </div>
+                  )}
+                  <button
+                    type="button"
+                    className="btn-secondary"
+                    disabled={busy}
+                    onClick={() => void loadData()}
+                  >
+                    ลองใหม่
+                  </button>
+                </div>
+              ) : (
+                <div className="loading">กำลังโหลดข้อมูล…</div>
+              )}
             </div>
           ) : (
             <DiscordGate
@@ -306,6 +328,8 @@ export function RosterManagePanel() {
               user={auth.user}
               onLogout={() => void doLogout()}
             />
+
+            {gate?.problem && <div className="config-warning">⚠️ {gate.problem}</div>}
 
             <div className="stats">
               <div className="stat-card">

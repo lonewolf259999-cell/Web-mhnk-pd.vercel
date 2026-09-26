@@ -53,9 +53,12 @@ export const ROSTER_MANAGE: PermissionSource = {
   },
 };
 
-/** Where the /proctor list lives: Pending!I1 holds the key, J1 the ids. The
-    pending sheet is read as A:H everywhere else, so these two sit outside
-    every range the rest of the code touches. */
+/** Where the /proctor list lives: Pending!L1 holds the key, M1 the ids.
+
+    Moved off I1/J1 when column I became the submission's Discord message id:
+    the pending data range now reaches I, and a config cell inside it would
+    arrive as a column header and ship the allowlist to the browser with every
+    row. J and K are left empty as room for the data row to grow again. */
 export const PROCTOR: PermissionSource = {
   name: 'proctor',
   get spreadsheetId() {
@@ -64,7 +67,7 @@ export const PROCTOR: PermissionSource = {
   get sheetName() {
     return config.PENDING_SHEET_NAME;
   },
-  range: 'I1:J1',
+  range: 'L1:M1',
   key: 'PROCTOR_IDDC',
   get fallback() {
     return config.PROCTOR_IDDC;
@@ -129,7 +132,17 @@ async function readAllowlist(source: PermissionSource): Promise<Allowlist> {
 /** Cached for CACHE_TTL, so a burst of clicks costs one Sheets read and an id
     removed from the sheet stops working within seconds — no redeploy. */
 function allowlist(source: PermissionSource): Promise<Allowlist> {
-  return cached(`permission:${source.name}`, () => readAllowlist(source));
+  return cached(`permission:${source.name}`, async () => {
+    const result = await readAllowlist(source);
+
+    /* Logged once per cache fill rather than per request. The page shows this
+       only to someone already through the gate, and a sheet broken badly
+       enough can leave nobody through — so the log is the path that always
+       reports it. */
+    if (result.problem) console.warn(`[permissions] ${source.name}: ${result.problem}`);
+
+    return result;
+  });
 }
 
 /**
@@ -145,7 +158,12 @@ export async function checkPermission(
   if (!userId) return { userId: null, allowed: false, problem: '' };
 
   const { ids, problem } = await allowlist(source);
-  return { userId, allowed: ids.has(userId), problem };
+  const allowed = ids.has(userId);
+
+  /* The diagnostic names the sheet and the cell it expects. That is worth
+     saying to someone who can go and fix it, and is nobody else's business —
+     so it travels with a yes and never with a no. */
+  return { userId, allowed, problem: allowed ? problem : '' };
 }
 
 /**
@@ -156,7 +174,7 @@ export async function requirePermission(
   request: Request | undefined,
   source: PermissionSource
 ): Promise<string> {
-  const { userId, allowed, problem } = await checkPermission(request, source);
+  const { userId, allowed } = await checkPermission(request, source);
 
   if (!userId) {
     throw new ApiError('กรุณาเชื่อมต่อ Discord ก่อนใช้งานหน้านี้', 401);
@@ -164,11 +182,9 @@ export async function requirePermission(
 
   if (!allowed) {
     /* The id is echoed back because it is the one thing the person needs in
-       order to be granted access — it goes to whoever edits the sheet. */
-    throw new ApiError(
-      `ไม่มีสิทธิ์ใช้งานหน้านี้ (Discord ID: ${userId})` + (problem ? ` — ${problem}` : ''),
-      403
-    );
+       order to be granted access — it goes to whoever grants it. Nothing about
+       where the list is kept: that is not theirs to know. */
+    throw new ApiError(`ไม่มีสิทธิ์ใช้งานหน้านี้ (Discord ID: ${userId})`, 403);
   }
 
   return userId;

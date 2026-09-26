@@ -7,7 +7,16 @@ import {
   sendMedical,
   sendRegistration,
 } from '@/server/services/discord';
-import { addPendingRegistration, updatePendingRegistration } from '@/server/services/pending';
+import {
+  addPendingRegistration,
+  findPendingMessageId,
+  updatePendingRegistration,
+} from '@/server/services/pending';
+import {
+  addMedicalApplication,
+  findMedicalMessageId,
+  updateMedicalApplication,
+} from '@/server/services/medicalApplications';
 import { ApiError } from '@/server/errors';
 import { clientKey, rateLimit } from '@/server/rateLimit';
 import { readSessionUserId } from '@/server/services/session';
@@ -126,6 +135,7 @@ const medicalBody = t.Object({
   joinReason: t.String(),
   discordId: t.String(),
   discordUserId: t.Optional(t.String()),
+  discordDisplayName: t.Optional(t.String()),
 });
 
 export const registrationRoutes = new Elysia({ name: 'registration' })
@@ -159,6 +169,7 @@ export const registrationRoutes = new Elysia({ name: 'registration' })
           icPhone: data.icPhone,
           ocAge: data.ocAge,
           steamUrl: data.steamUrl,
+          messageId,
         });
       } catch (err) {
         console.error('[register] pending sheet write failed:', (err as Error).message);
@@ -222,6 +233,26 @@ export const registrationRoutes = new Elysia({ name: 'registration' })
     }
   )
 
+  /* The application belonging to whoever is signed in, without their having
+     to know its Discord message id. The id is found from the sheet by the id
+     in the session cookie, so this can only ever reach the caller's own
+     submission — the ownership check inside fetchRegistration then still runs,
+     because a row is a weaker claim than the message itself. */
+  .get('/register/mine', async ({ request }) => {
+    rateLimit(clientKey(request, 'edit'), EDIT_LIMIT, EDIT_WINDOW_MS);
+    const verifiedUserId = requireDiscordUser(request);
+
+    const messageId = await findPendingMessageId(verifiedUserId);
+    if (!messageId) {
+      throw new ApiError(
+        'ไม่พบใบสมัครของบัญชี Discord นี้ — ใบที่สมัครไว้ก่อนระบบนี้จะยังไม่มีข้อมูลผูกไว้ กรุณากรอก Message ID เอง',
+        404
+      );
+    }
+
+    return fetchRegistration(messageId, verifiedUserId);
+  })
+
   .get(
     '/register/fetch/:messageId',
     async ({ params, request }) => {
@@ -244,7 +275,7 @@ export const registrationRoutes = new Elysia({ name: 'registration' })
       const errors = validateMedical(body);
       if (errors.length) reject(errors);
 
-      const messageId = await sendMedical({
+      const data = {
         icName: body.icName.trim(),
         ocAge: body.ocAge,
         timeStart: body.timeStart.trim(),
@@ -252,7 +283,21 @@ export const registrationRoutes = new Elysia({ name: 'registration' })
         medicalExperience: body.medicalExperience.trim(),
         joinReason: body.joinReason.trim(),
         discordId: body.discordId.trim(),
-      });
+      };
+
+      const messageId = await sendMedical(data);
+
+      // Same bargain as the police sheet: Discord is the record of truth, so a
+      // sheet failure must not fail the application.
+      try {
+        await addMedicalApplication({
+          ...data,
+          discordName: body.discordDisplayName || '',
+          messageId,
+        });
+      } catch (err) {
+        console.error('[medical] sheet write failed:', (err as Error).message);
+      }
 
       return {
         success: true,
@@ -292,6 +337,20 @@ export const registrationRoutes = new Elysia({ name: 'registration' })
         verifiedUserId
       );
 
+      // Best-effort, as on submit: the embed is already updated.
+      try {
+        await updateMedicalApplication(verifiedUserId, {
+          icName: body.icName.trim(),
+          ocAge: body.ocAge,
+          timeStart: body.timeStart.trim(),
+          timeEnd: body.timeEnd.trim(),
+          medicalExperience: body.medicalExperience.trim(),
+          joinReason: body.joinReason.trim(),
+        });
+      } catch (err) {
+        console.error('[medical] sheet update failed:', (err as Error).message);
+      }
+
       return { success: true, message: 'แก้ไขข้อมูลสำเร็จ! Embed ใน Discord อัปเดตแล้ว', editCount };
     },
     {
@@ -301,6 +360,23 @@ export const registrationRoutes = new Elysia({ name: 'registration' })
       ]),
     }
   )
+
+  /* The medical application belonging to whoever is signed in — the same
+     lookup /register/mine does, against the other sheet. */
+  .get('/medical/mine', async ({ request }) => {
+    rateLimit(clientKey(request, 'edit'), EDIT_LIMIT, EDIT_WINDOW_MS);
+    const verifiedUserId = requireDiscordUser(request);
+
+    const messageId = await findMedicalMessageId(verifiedUserId);
+    if (!messageId) {
+      throw new ApiError(
+        'ไม่พบใบสมัครของบัญชี Discord นี้ — ใบที่สมัครไว้ก่อนระบบนี้จะยังไม่มีข้อมูลผูกไว้ กรุณากรอก Message ID เอง',
+        404
+      );
+    }
+
+    return fetchMedical(messageId, verifiedUserId);
+  })
 
   .get(
     '/medical/fetch/:messageId',

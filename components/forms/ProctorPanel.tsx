@@ -44,6 +44,7 @@ export function ProctorPanel() {
   const [checking, setChecking] = useState(true);
   const [rows, setRows] = useState<Row[]>([]);
   const [loaded, setLoaded] = useState(false);
+  const [loadError, setLoadError] = useState('');
   const [busy, setBusy] = useState(false);
   const [reloading, setReloading] = useState(false);
 
@@ -74,6 +75,7 @@ export function ProctorPanel() {
   const loadData = useCallback(async () => {
     setBusy(true);
     setReloading(true);
+    setLoadError('');
     try {
       const result = await mutations.listPending();
       const data = result.data as Row[];
@@ -84,6 +86,7 @@ export function ProctorPanel() {
       const message = (err as Error).message;
       showToast(message || 'โหลดข้อมูลไม่สำเร็จ', 'error');
       log(`Error: ${message}`);
+      setLoadError(message || 'โหลดข้อมูลไม่สำเร็จ');
 
       /* Access can be taken away while the page is open — the list is re-read
          on every request. Drop back to the gate so it says why, rather than
@@ -199,7 +202,26 @@ export function ProctorPanel() {
              someone who has it. */
           allowed ? (
             <div className="login-box">
-              <div className="loading">กำลังโหลดข้อมูล</div>
+              {loadError ? (
+                <div>
+                  <div style={{ color: '#ef4444', marginBottom: 6 }}>❌ {loadError}</div>
+                  {gate?.problem && (
+                    <div className="config-warning" style={{ textAlign: 'left' }}>
+                      ⚠️ {gate.problem}
+                    </div>
+                  )}
+                  <button
+                    type="button"
+                    className="btn-secondary"
+                    disabled={busy}
+                    onClick={() => void loadData()}
+                  >
+                    ลองใหม่
+                  </button>
+                </div>
+              ) : (
+                <div className="loading">กำลังโหลดข้อมูล</div>
+              )}
             </div>
           ) : (
             <DiscordGate
@@ -218,6 +240,8 @@ export function ProctorPanel() {
               user={auth.user}
               onLogout={() => void doLogout()}
             />
+
+            {gate?.problem && <div className="config-warning">⚠️ {gate.problem}</div>}
 
             <div className="stats">
               <div className="stat-card">

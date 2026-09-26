@@ -8,7 +8,7 @@
 .proctor-page .subtitle { text-align: center; color: #888; margin-bottom: 30px; }
 
 /* ========== Form Elements ========== */
-.proctor-page input[type="password"], .proctor-page input[type="text"] {
+.proctor-page input[type="text"] {
     width: 100%; padding: 12px 16px; background: #252545; border: 1px solid #3a3a5a;
     border-radius: 8px; color: #fff; font-size: 16px; outline: none; margin-bottom: 15px;
 }
@@ -23,7 +23,6 @@
 .proctor-page button:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
 
 /* ========== Buttons ========== */
-.proctor-page .btn-primary { background: #f0c040; color: #1a1a2e; }
 .proctor-page .btn-success { background: #22c55e; color: #fff; }
 .proctor-page .btn-danger { background: #ef4444; color: #fff; }
 .proctor-page .btn-secondary { background: #3a3a5a; color: #e0e0e0; }
@@ -81,6 +80,13 @@
 .proctor-page .dc-bar .dc-name { font-size: 14px; font-weight: 600; color: #e0e0e0; line-height: 1.3; }
 .proctor-page .dc-bar .dc-id { font-size: 11px; color: #888; line-height: 1.3; }
 .proctor-page .dc-bar .dc-bar-logout { margin-left: 6px; }
+
+/* Sheet misconfiguration. Only someone already through the gate sees this —
+   they are the ones who can go and fix the cell it names. */
+.proctor-page .config-warning {
+    background: #f59e0b1a; border: 1px solid #f59e0b55; color: #f59e0b;
+    border-radius: 8px; padding: 10px 14px; margin-bottom: 20px; font-size: 13px;
+}
 
 /* ========== Stats ========== */
 .proctor-page .stats { display: flex; gap: 16px; margin-bottom: 20px; flex-wrap: wrap; }

@@ -68,6 +68,10 @@ export const mutations = {
   fetchRegister: (messageId: string, discordUserId?: string) =>
     unwrap(client.api.register.fetch({ messageId }).get({ query: { discordUserId } })),
 
+  /** The signed-in account's own application, found without them having to
+      know its Discord message id. 404 when the row predates that being kept. */
+  myRegistration: () => unwrap(client.api.register.mine.get()),
+
   medical: (input: Parameters<typeof client.api.medical.post>[0]) =>
     unwrap(client.api.medical.post(input)),
 
@@ -76,6 +80,9 @@ export const mutations = {
 
   fetchMedical: (messageId: string, discordUserId?: string) =>
     unwrap(client.api.medical.fetch({ messageId }).get({ query: { discordUserId } })),
+
+  /** The signed-in account's own medical application. 404 when there is none. */
+  myMedical: () => unwrap(client.api.medical.mine.get()),
 
   /* ---- the two admin consoles ----
      Both are gated by a Discord allowlist rather than a PIN, so nothing below

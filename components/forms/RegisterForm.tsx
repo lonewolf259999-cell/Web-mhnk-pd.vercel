@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { mutations } from '@/lib/client/queries';
 import { useDiscordAuth } from '@/lib/client/useDiscordAuth';
 import { useToast } from '@/components/ui/Toast';
@@ -9,6 +9,7 @@ import {
   DiscordConnectPanel,
   DiscordIdField,
   EditSection,
+  type EditLookup,
   EditToggle,
   ErrorBox,
   Field,
@@ -46,26 +47,26 @@ export function RegisterForm() {
   const [savedMessageId, setSavedMessageId] = useState<string | null>(null);
 
   const [editMode, setEditMode] = useState(false);
+  const [lookup, setLookup] = useState<EditLookup | null>(null);
   const [messageId, setMessageId] = useState('');
   const [editCount, setEditCount] = useState(0);
   const [fetching, setFetching] = useState(false);
+  const [checkingExisting, setCheckingExisting] = useState(false);
   const [copied, setCopied] = useState(false);
+
+  /** Which account has already been looked up, so connecting does it once. */
+  const checkedFor = useRef<string | null>(null);
 
   const set = (key: keyof FormState) => (e: React.ChangeEvent<HTMLInputElement>) =>
     setForm((prev) => ({ ...prev, [key]: e.target.value }));
 
-  /** Pulls an existing submission back out of its Discord embed. */
-  async function loadExisting() {
-    if (!messageId.trim()) {
-      setErrors(['กรุณาระบุ Message ID']);
-      return;
-    }
-
-    setFetching(true);
-    setErrors([]);
-
-    try {
-      const result = await mutations.fetchRegister(messageId.trim(), auth.user?.userId);
+  /** Drops a submission read back out of Discord into the form. */
+  const applyLoaded = useCallback(
+    (result: {
+      data: { ocName: string; icName: string; ocAge: number; icPhone: string; steamUrl: string };
+      editCount: number;
+      messageId: string;
+    }) => {
       const [first = '', ...rest] = (result.data.icName || '').split(' ');
 
       setForm({
@@ -77,6 +78,79 @@ export function RegisterForm() {
         steamUrl: result.data.steamUrl,
       });
       setEditCount(result.editCount);
+      setMessageId(result.messageId);
+    },
+    []
+  );
+
+  /**
+   * Connecting Discord is now enough to find an earlier application: the id is
+   * looked up from the session, so someone who has applied before lands in the
+   * editor rather than filing a second one. Finding nothing — no row, or a row
+   * from before the id was recorded — means this is a first application, and
+   * the page carries on exactly as it did.
+   */
+  useEffect(() => {
+    const userId = auth.user?.userId;
+    if (!userId || checkedFor.current === userId) return;
+    checkedFor.current = userId;
+
+    let alive = true;
+    setCheckingExisting(true);
+
+    mutations
+      .myRegistration()
+      .then((result) => {
+        if (!alive) return;
+        applyLoaded(result);
+        setEditMode(true);
+        setLookup({ status: 'found', message: '' });
+        toast('พบใบสมัครเดิมของคุณ — โหลดข้อมูลขึ้นมาให้แล้ว', 'success');
+      })
+      .catch(() => {
+        /* Nothing to edit; this is a new application. Not an error to report. */
+      })
+      .finally(() => {
+        if (alive) setCheckingExisting(false);
+      });
+
+    return () => {
+      alive = false;
+    };
+  }, [auth.user?.userId, applyLoaded, toast]);
+
+  /**
+   * Opening the editor now looks the application up by the Discord account the
+   * request is signed in as, so nobody has to have kept the message id. An
+   * application submitted before the sheet started recording that id falls
+   * back to the field that asks for it.
+   */
+  async function startEdit() {
+    setEditMode(true);
+    setErrors([]);
+    setLookup({ status: 'loading', message: '' });
+
+    try {
+      applyLoaded(await mutations.myRegistration());
+      setLookup({ status: 'found', message: '' });
+      toast('พบใบสมัครของคุณแล้ว', 'success');
+    } catch (err) {
+      setLookup({ status: 'missing', message: (err as Error).message });
+    }
+  }
+
+  /** The fallback: an id pasted by hand. */
+  async function loadExisting() {
+    if (!messageId.trim()) {
+      setErrors(['กรุณาระบุ Message ID']);
+      return;
+    }
+
+    setFetching(true);
+    setErrors([]);
+
+    try {
+      applyLoaded(await mutations.fetchRegister(messageId.trim(), auth.user?.userId));
       toast('โหลดข้อมูลสำเร็จ', 'success');
     } catch (err) {
       setErrors([(err as Error).message]);
@@ -168,6 +242,7 @@ export function RegisterForm() {
                     setSavedMessageId(null);
                     setForm(EMPTY);
                     setEditMode(false);
+                    setLookup(null);
                     setMessageId('');
                   }}
                   className={c.resetButton}
@@ -179,6 +254,7 @@ export function RegisterForm() {
                   onClick={() => {
                     setMessageId(savedMessageId);
                     setEditMode(true);
+                    setLookup({ status: 'found', message: '' });
                     setSavedMessageId(null);
                   }}
                   className={c.editAfterSuccessButton}
@@ -211,16 +287,16 @@ export function RegisterForm() {
 
             {auth.failed && <ErrorBox errors={['เชื่อมต่อ Discord ล้มเหลว กรุณาลองใหม่อีกครั้ง']} />}
 
+            {checkingExisting && (
+              <div className="flex items-center justify-center gap-2 rounded-md border border-gold/20 bg-gold/5 px-4 py-2.5 text-[13px] text-ink-dim">
+                <span>⏳</span> กำลังตรวจสอบว่าคุณเคยสมัครไว้แล้วหรือไม่
+              </div>
+            )}
+
             <form onSubmit={submit} className="flex flex-col gap-6">
               <DiscordIdField userId={auth.user?.userId ?? ''} />
 
-              <EditToggle
-                editMode={editMode}
-                onToggle={() => {
-                  setEditMode((v) => !v);
-                  setErrors([]);
-                }}
-              />
+              <EditToggle editMode={editMode} onToggle={() => void startEdit()} />
 
               {editMode && (
                 <EditSection
@@ -228,8 +304,10 @@ export function RegisterForm() {
                   onMessageIdChange={setMessageId}
                   onFetch={loadExisting}
                   fetching={fetching}
+                  lookup={lookup}
                   onCancel={() => {
                     setEditMode(false);
+                    setLookup(null);
                     setErrors([]);
                   }}
                 />

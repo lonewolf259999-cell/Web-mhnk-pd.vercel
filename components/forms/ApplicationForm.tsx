@@ -205,19 +205,35 @@ export function EditToggle({ editMode, onToggle }: { editMode: boolean; onToggle
   );
 }
 
+/** How the automatic lookup of the signed-in account's own application went.
+    Absent on the medical form, which has no sheet to look in — it gets the
+    manual field exactly as before. */
+export interface EditLookup {
+  status: 'loading' | 'found' | 'missing';
+  /** Why it could not be found: shown above the manual fallback. */
+  message: string;
+}
+
 export function EditSection({
   messageId,
   onMessageIdChange,
   onFetch,
   fetching,
   onCancel,
+  lookup,
 }: {
   messageId: string;
   onMessageIdChange: (value: string) => void;
   onFetch: () => void;
   fetching: boolean;
   onCancel: () => void;
+  lookup?: EditLookup | null;
 }) {
+  /* The id is only asked for when it could not be found automatically — which
+     is every medical edit, and a registration whose row predates the column
+     that records it. */
+  const askForId = !lookup || lookup.status === 'missing';
+
   return (
     <div className="animate-[fadeIn_0.3s_ease] rounded-md border border-gold/15 bg-gold/5 p-4">
       <div className="flex items-center gap-2.5 rounded-md border border-gold/30 bg-gold/[0.12] px-4 py-3 text-sm font-semibold text-gold">
@@ -232,7 +248,27 @@ export function EditSection({
         </button>
       </div>
 
-      <div className="mt-4 flex flex-col gap-2">
+      {lookup?.status === 'loading' && (
+        <div className="mt-4 flex items-center gap-2 text-[13px] text-ink-dim">
+          <span>⏳</span> กำลังค้นหาใบสมัครของคุณ
+        </div>
+      )}
+
+      {lookup?.status === 'found' && (
+        <div className="mt-4 flex items-start gap-2 text-[13px] leading-relaxed text-success">
+          <span className="shrink-0">✅</span>
+          <span>พบใบสมัครของคุณแล้ว — โหลดข้อมูลขึ้นฟอร์มให้เรียบร้อย แก้ไขแล้วกดบันทึกได้เลย</span>
+        </div>
+      )}
+
+      {lookup?.status === 'missing' && lookup.message && (
+        <div className="mt-4 flex items-start gap-2 rounded-md border border-gold/25 bg-gold/10 px-3 py-2.5 text-[12px] leading-relaxed text-gold">
+          <span className="shrink-0">💡</span>
+          <span>{lookup.message}</span>
+        </div>
+      )}
+
+      <div className={`mt-4 flex-col gap-2 ${askForId ? 'flex' : 'hidden'}`}>
         <label className="flex items-center gap-2 text-sm font-semibold text-ink">
           <span className="text-lg">📄</span> Message ID
         </label>
@@ -284,7 +320,7 @@ export function ErrorBox({
         success ? 'border-success/30 bg-success/10' : 'border-danger/30 bg-danger/10'
       }`}
     >
-      <span className="shrink-0 text-xl">⚠</span>
+      <span className="shrink-0 text-xl">{success ? '✅' : '⚠'}</span>
       <ul className="space-y-1">
         {errors.map((error, i) => (
           <li

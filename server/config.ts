@@ -43,6 +43,7 @@ export const config = {
   RULES_SHEET_NAME: 'rules',
   FINES_SHEET_NAME: 'fines',
   PENDING_SHEET_NAME: process.env.PENDING_SHEET_NAME || 'Pending',
+  MEDICAL_SHEET_NAME: process.env.MEDICAL_SHEET_NAME || 'Medical',
   ROSTER_SHEET_NAME: 'NamePD',
   ROSTER_OUT_SHEET_NAME: 'OutDC',
 

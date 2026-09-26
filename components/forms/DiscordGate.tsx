@@ -49,8 +49,9 @@ export interface GateState {
       null means "not signed in". */
   userId: string | null;
   allowed: boolean;
-  /** Set when the allowlist itself could not be trusted, so a misconfigured
-      sheet does not read to the user as "you were removed". */
+  /** Set when the allowlist could not be trusted — only ever alongside
+      `allowed`, so it reaches someone who can act on it. The console shows it;
+      the gate deliberately does not. */
   problem: string;
 }
 
@@ -175,9 +176,6 @@ export function DiscordGate({
                 </div>
               </div>
 
-              {gate!.problem && (
-                <div style={{ marginTop: 10, color: '#f59e0b' }}>⚠️ {gate!.problem}</div>
-              )}
             </div>
           </div>
         )}

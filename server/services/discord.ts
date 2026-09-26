@@ -311,7 +311,7 @@ export async function fetchMedical(messageId: string, verifiedUserId: string) {
 /* ---------- proctor ---------- */
 
 export async function sendProctorRecord(
-  proctor: { id?: string; name?: string },
+  proctor: { id: string },
   applicant: { icName: string; discordId?: string }
 ): Promise<void> {
   const url = config.DISCORD_PROCTOR_WEBHOOK_URL;
@@ -331,11 +331,7 @@ export async function sendProctorRecord(
     title: '📋 บันทึกการคุมสอบ Proctor',
     color: 0x1dc9b7,
     fields: [
-      {
-        name: '👮 ผู้คุมสอบ',
-        value: proctor.id ? `<@${proctor.id}>` : proctor.name || 'ไม่ระบุ',
-        inline: false,
-      },
+      { name: '👮 ผู้คุมสอบ', value: `<@${proctor.id}>`, inline: false },
       { name: '👤 ผู้สอบ', value: applicant.icName || 'ไม่ระบุ', inline: true },
       { name: '📅 วันที่สอบ', value: new Date().toISOString().split('T')[0], inline: true },
       {
@@ -349,7 +345,7 @@ export async function sendProctorRecord(
   };
 
   await discordRequest(waitUrl(url), 'POST', {
-    content: proctor.id ? `<@${proctor.id}>` : undefined,
+    content: `<@${proctor.id}>`,
     embeds: [embed],
   });
 }
