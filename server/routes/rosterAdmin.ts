@@ -1,3 +1,9 @@
+/* Roster management — the /rostermanage console.
+
+   Gated by a Discord id allowlist held in the sheet, not by ADMIN_PIN: see
+   services/permissions.ts for why, and for where the list lives. The pending
+   registration routes that used to sit here moved to routes/pending.ts. */
+
 import { Elysia, t } from 'elysia';
 import {
   EXIT_REASONS,
@@ -8,15 +14,13 @@ import {
   updateStatus,
   type ExitReason,
 } from '@/server/services/roster';
+import { ApiError } from '@/server/errors';
 import {
-  approvePending,
-  getPendingRegistrations,
-  rejectPending,
-} from '@/server/services/pending';
-import { sendProctorRecord } from '@/server/services/discord';
-import { ApiError, requirePin } from '@/server/errors';
+  ROSTER_MANAGE,
+  checkPermission,
+  requirePermission,
+} from '@/server/services/permissions';
 
-const pinOnly = t.Object({ pin: t.String() });
 const rowParam = t.Object({ row: t.Numeric() });
 
 function assertReason(reason: string): ExitReason {
@@ -27,105 +31,52 @@ function assertReason(reason: string): ExitReason {
 }
 
 export const rosterAdminRoutes = new Elysia({ name: 'roster-admin' })
-  /* ---------- pending registrations ---------- */
+  /* What the page asks on load: am I signed in, and am I on the list? It needs
+     its own endpoint because the Discord session lives in an HttpOnly cookie
+     the page cannot read — without this, every refresh would look like a
+     logout. Answers instead of failing, so "sheet misconfigured" arrives as
+     something the page can display. */
+  .get('/roster/access', ({ request }) => checkPermission(request, ROSTER_MANAGE))
 
-  .post(
-    '/pending',
-    async ({ body, request }) => {
-      requirePin(body, request);
-      return { success: true, data: await getPendingRegistrations() };
-    },
-    { body: pinOnly }
-  )
+  .post('/roster/namepd', async ({ request }) => {
+    await requirePermission(request, ROSTER_MANAGE);
+    return { success: true, data: await getNamePDMembers() };
+  })
 
-  .post(
-    '/pending/approve/:row',
-    async ({ params, body, request }) => {
-      requirePin(body, request);
-      if (params.row < 1) throw new ApiError('ระบุหมายเลขแถวไม่ถูกต้อง', 400);
-      if (!body.proctorDiscordId) {
-        throw new ApiError('กรุณาเชื่อมต่อ Discord (Proctor) ก่อนอนุมัติ', 400);
-      }
-
-      const applicant = (await getPendingRegistrations()).find((r) => r._row === params.row);
-      await approvePending(params.row);
-
-      // Notifying the proctor is best-effort; approval already succeeded.
-      if (applicant) {
-        void sendProctorRecord(
-          { id: body.proctorDiscordId, name: body.proctorDiscordName },
-          {
-            icName: String(applicant['ชื่อ IC'] ?? ''),
-            discordId: String(applicant['Discord ID'] ?? ''),
-          }
-        ).catch((err) => console.error('[pending] proctor webhook failed:', err.message));
-      }
-
-      return { success: true, message: 'อนุมัติเรียบร้อย' };
-    },
-    {
-      params: rowParam,
-      body: t.Object({
-        pin: t.String(),
-        proctorDiscordId: t.Optional(t.String()),
-        proctorDiscordName: t.Optional(t.String()),
-      }),
-    }
-  )
-
-  .post(
-    '/pending/reject/:row',
-    async ({ params, body, request }) => {
-      requirePin(body, request);
-      if (params.row < 1) throw new ApiError('ระบุหมายเลขแถวไม่ถูกต้อง', 400);
-
-      await rejectPending(params.row);
-      return { success: true, message: 'ปฏิเสธเรียบร้อย' };
-    },
-    { params: rowParam, body: pinOnly }
-  )
-
-  /* ---------- roster ---------- */
-
-  .post(
-    '/roster/namepd',
-    async ({ body, request }) => {
-      requirePin(body, request);
-      return { success: true, data: await getNamePDMembers() };
-    },
-    { body: pinOnly }
-  )
-
-  .post(
-    '/roster/outdc',
-    async ({ body, request }) => {
-      requirePin(body, request);
-      return { success: true, data: await getOutDCMembers() };
-    },
-    { body: pinOnly }
-  )
+  .post('/roster/outdc', async ({ request }) => {
+    await requirePermission(request, ROSTER_MANAGE);
+    return { success: true, data: await getOutDCMembers() };
+  })
 
   .put(
     '/roster/status/:row',
     async ({ params, body, request }) => {
-      requirePin(body, request);
+      const actor = await requirePermission(request, ROSTER_MANAGE);
       // An empty status clears the field back to "normal".
       if (body.status !== '') assertReason(body.status);
 
       await updateStatus(params.row, body.status);
+
+      /* Every write is now attributable to one account, which is the point of
+         the allowlist — so record who made it. */
+      console.log(`[roster] ${actor} status row=${params.row} → "${body.status}"`);
+
       const display = body.status || '✅ ปกติ';
       return { success: true, message: `อัปเดตสถานะเป็น "${display}" แล้ว` };
     },
-    { params: rowParam, body: t.Object({ pin: t.String(), status: t.String() }) }
+    { params: rowParam, body: t.Object({ status: t.String() }) }
   )
 
   .post(
     '/roster/move-out/:row',
     async ({ params, body, request }) => {
-      requirePin(body, request);
+      const actor = await requirePermission(request, ROSTER_MANAGE);
       const reason = assertReason(body.reason);
 
       const result = await moveToOutDC(params.row, reason);
+      console.log(
+        `[roster] ${actor} move-out row=${params.row} ${result.code} ${result.name} (${reason})`
+      );
 
       const warnings: string[] = [];
       if (reason === 'ถูกปลดออก' || reason === 'ติดต่อขอออก') {
@@ -145,5 +96,5 @@ export const rosterAdminRoutes = new Elysia({ name: 'roster-admin' })
         warnings,
       };
     },
-    { params: rowParam, body: t.Object({ pin: t.String(), reason: t.String() }) }
+    { params: rowParam, body: t.Object({ reason: t.String() }) }
   );

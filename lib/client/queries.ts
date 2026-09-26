@@ -47,6 +47,9 @@ export const mutations = {
   /** Ends the admin session — only the server can clear an HttpOnly cookie. */
   adminLogout: () => unwrap(client.api.pin.logout.post()),
 
+  /** Ends the Discord session, for the same reason: the cookie is HttpOnly. */
+  discordLogout: () => unwrap(client.api.discord.logout.post()),
+
   markPaid: (
     input: { pin: string; weekName: string; officerName: string; idempotencyKey?: string },
     signal?: AbortSignal
@@ -84,15 +87,24 @@ export const mutations = {
   rejectPending: (row: number, pin: string) =>
     unwrap(client.api.pending.reject({ row }).post({ pin })),
 
-  namePD: (pin: string) => unwrap(client.api.roster.namepd.post({ pin })),
+  /* ---- rostermanage: gated by the Discord allowlist, not a PIN ----
+     Nothing here carries a credential. The signed Discord session cookie rides
+     along automatically and the server matches it against the list in the
+     sheet, so there is no longer anything for the page to hold or to send. */
 
-  outDC: (pin: string) => unwrap(client.api.roster.outdc.post({ pin })),
+  /** Am I signed in, and am I on the list? Asked on every page load, because
+      the session cookie is HttpOnly and the page cannot read it itself. */
+  rosterAccess: () => unwrap(client.api.roster.access.get()),
 
-  setRosterStatus: (row: number, pin: string, status: string) =>
-    unwrap(client.api.roster.status({ row }).put({ pin, status })),
+  namePD: () => unwrap(client.api.roster.namepd.post()),
 
-  moveOut: (row: number, pin: string, reason: string) =>
-    unwrap(client.api.roster['move-out']({ row }).post({ pin, reason })),
+  outDC: () => unwrap(client.api.roster.outdc.post()),
+
+  setRosterStatus: (row: number, status: string) =>
+    unwrap(client.api.roster.status({ row }).put({ status })),
+
+  moveOut: (row: number, reason: string) =>
+    unwrap(client.api.roster['move-out']({ row }).post({ reason })),
 
   /* ---- conduct/rules/fines admin CRUD ---- */
 

@@ -13,6 +13,7 @@ import {
   adminCookieHeader,
   createAdminToken,
   readAdminSession,
+  sessionCookieHeader,
 } from '@/server/services/session';
 
 export const adminRoutes = new Elysia({ name: 'admin' })
@@ -62,6 +63,18 @@ export const adminRoutes = new Elysia({ name: 'admin' })
      cookie itself, so "lock" has to ask for it. */
   .post('/pin/logout', ({ request, set }) => {
     set.headers['set-cookie'] = adminCookieHeader(
+      '',
+      0,
+      new URL(request.url).protocol === 'https:'
+    );
+    return { success: true };
+  })
+
+  /* Ends the Discord session. Shared with /register and /medical on purpose:
+     disconnecting means this browser is no longer signed in as that Discord
+     account anywhere. Like the admin cookie, only the server can clear it. */
+  .post('/discord/logout', ({ request, set }) => {
+    set.headers['set-cookie'] = sessionCookieHeader(
       '',
       0,
       new URL(request.url).protocol === 'https:'

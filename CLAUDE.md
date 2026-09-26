@@ -65,6 +65,20 @@ Large read-only sheets come through Google's GViz CSV export; writes and the rul
 
 `/register` and `/medical` are both rate-limited (10/min per client) via the same `rateLimit()` helper — apply the same call to any new public submission endpoint.
 
+### /rostermanage authorises on a Discord allowlist, not the PIN
+
+`server/services/permissions.ts` gates that page instead: the verified Discord id from the session cookie has to appear in a list the spreadsheet holds at **`NamePD!AA2`** (the literal key `ROSTERMANAGE_IDDC`) and **`AB2`** (the ids, any separator, `<@id>` tolerated). `requirePermission` returns the actor's id, so a write can be attributed — the thing one shared PIN never could.
+
+Consequences worth knowing before changing it:
+
+- **The list is not a credential.** An id only works for whoever can log into that Discord account, which is why it is safe in a sheet other people can read. `ADMIN_PIN` would not be — never move it there.
+- Read through the Sheets API, not GViz: the GViz export is CDN-cached, so a revoked id would keep working for minutes.
+- Those two cells are positional like the rest of the sheet layer, so the key cell is **verified** rather than assumed. An inserted row reports itself instead of silently reading whatever slid into AA2.
+- `ROSTERMANAGE_IDDC` in the environment is a standby list, merged in on every path including the failure ones. It is what stops a mistyped cell from locking the last admin out of the page that edits that cell. It does not help if Discord OAuth itself breaks — nothing short of a non-Discord gate would.
+- The page asks `GET /roster/access` on load because the session cookie is HttpOnly. Without that call a refresh looks like a logout.
+
+`/proctor` still uses `requirePin`; its routes were moved to `server/routes/pending.ts` so the two consoles no longer share a module. Its own list is meant to land at `Pending!I1:J1` under the key `PROCTOR_IDDC` — add a second `PermissionSource` for it rather than a second reader.
+
 ### Google Sheets lags its own writes
 
 The GViz export is CDN-cached, so re-reading a week immediately after marking it paid can still report it unpaid. `components/profile/ProfileClient.tsx` keeps a `paidThisSession` ref that overrides re-fetched data. Payments also carry idempotency keys, and a request lost to the 10s timeout is resolved by querying `/api/mark-paid/status` rather than being reported as a failure — that machinery exists to avoid double-paying someone, so do not simplify it away.

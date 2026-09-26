@@ -53,6 +53,13 @@ export const config = {
   DISCORD_PROCTOR_WEBHOOK_URL: process.env.DISCORD_PROCTOR_WEBHOOK_URL || '',
   DISCORD_OUTPD_WEBHOOK_URL: process.env.DISCORD_OUTPD_WEBHOOK_URL || '',
 
+/* Standby ids for the two Discord allowlists, merged with the lists the
+     sheets hold in NamePD!AB2 and Pending!J1. Normally empty: the sheet is
+     where access is granted. They exist so a mistyped key cell or an inserted
+     row cannot lock the last admin out of the page that edits that sheet. */
+  ROSTERMANAGE_IDDC: process.env.ROSTERMANAGE_IDDC || '',
+  PROCTOR_IDDC: process.env.PROCTOR_IDDC || '',
+
   APP_URL: process.env.APP_URL || 'http://localhost:3000',
 
   CACHE_TTL: 15_000,

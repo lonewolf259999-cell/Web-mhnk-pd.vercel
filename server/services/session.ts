@@ -106,16 +106,20 @@ export function readAdminSession(request: Request | undefined): boolean {
 }
 
 /** Serialised Set-Cookie value; `maxAge` 0 clears it. */
-export function adminCookieHeader(token: string, maxAgeSeconds: number, secure: boolean): string {
-  const bits = [
-    `${ADMIN_COOKIE}=${token}`,
-    'Path=/',
-    'HttpOnly',
-    'SameSite=Lax',
-    `Max-Age=${maxAgeSeconds}`,
-  ];
+function cookieHeader(name: string, value: string, maxAgeSeconds: number, secure: boolean): string {
+  const bits = [`${name}=${value}`, 'Path=/', 'HttpOnly', 'SameSite=Lax', `Max-Age=${maxAgeSeconds}`];
   if (secure) bits.push('Secure');
   return bits.join('; ');
+}
+
+export function adminCookieHeader(token: string, maxAgeSeconds: number, secure: boolean): string {
+  return cookieHeader(ADMIN_COOKIE, token, maxAgeSeconds, secure);
+}
+
+/** The same for the Discord session, used to log out. The cookie is HttpOnly,
+    so the browser cannot clear it itself and has to ask the server. */
+export function sessionCookieHeader(token: string, maxAgeSeconds: number, secure: boolean): string {
+  return cookieHeader(SESSION_COOKIE, token, maxAgeSeconds, secure);
 }
 
 /** Reads a cookie without pulling in a parser — the header is a flat list. */

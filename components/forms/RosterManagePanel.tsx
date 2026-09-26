@@ -1,16 +1,11 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { mutations } from '@/lib/client/queries';
 import { useDiscordAuth } from '@/lib/client/useDiscordAuth';
 import { CopyInline } from '@/components/ui/CopyInline';
-import {
-  AdminLoginBox,
-  DebugLog,
-  PageToast,
-  useDebugLog,
-  useToastState,
-} from './AdminShell';
+import { DebugLog, PageToast, useDebugLog, useToastState } from './AdminShell';
+import { DiscordGate, type GateState } from './DiscordGate';
 import type { RosterMember } from '@/server/services/roster';
 
 /* The sheet stores an empty status for "still serving"; everything else is an
@@ -50,8 +45,8 @@ export function RosterManagePanel() {
   const [toast, showToast] = useToastState();
   const [logText, log] = useDebugLog();
 
-  const [pin, setPin] = useState('');
-  const [sessionPin, setSessionPin] = useState('');
+  const [gate, setGate] = useState<GateState | null>(null);
+  const [checking, setChecking] = useState(true);
   const [loaded, setLoaded] = useState(false);
   const [busy, setBusy] = useState(false);
   const [reloading, setReloading] = useState(false);
@@ -68,43 +63,80 @@ export function RosterManagePanel() {
   const [confirming, setConfirming] = useState<PendingConfirm | null>(null);
   const [confirmRunning, setConfirmRunning] = useState(false);
 
-  async function loadData(withPin: string) {
+  /* Whether this browser is signed in, and whether that account is on the
+     allowlist in the sheet. The page cannot work either out for itself: the
+     Discord session is an HttpOnly cookie, so it has to ask the server. Asking
+     on every load is also what makes a refresh survive — the OAuth params in
+     the URL are stripped by then, the cookie is not. */
+  const refreshAccess = useCallback(async (): Promise<GateState> => {
+    try {
+      const result = await mutations.rosterAccess();
+      setGate(result);
+      return result;
+    } catch (err) {
+      // An unanswered question is not a yes.
+      const denied: GateState = { userId: null, allowed: false, problem: '' };
+      setGate(denied);
+      log(`Error: ${(err as Error).message}`);
+      return denied;
+    } finally {
+      setChecking(false);
+    }
+  }, [log]);
+
+  const loadData = useCallback(async () => {
     setBusy(true);
     setReloading(true);
     try {
-      const [inSystem, departed] = await Promise.all([
-        mutations.namePD(withPin),
-        mutations.outDC(withPin),
-      ]);
+      const [inSystem, departed] = await Promise.all([mutations.namePD(), mutations.outDC()]);
       const current = inSystem.data as RosterMember[];
       const gone = departed.data as RosterMember[];
 
       setNamePD(current);
       setOutDC(gone);
-      setSessionPin(withPin);
       setLoaded(true);
       log(`โหลด NamePD ${current.length} รายการ, OutDC ${gone.length} รายการ`);
     } catch (err) {
       const message = (err as Error).message;
-      showToast(message || 'PIN ไม่ถูกต้อง', 'error');
+      showToast(message || 'โหลดข้อมูลไม่สำเร็จ', 'error');
       log(`Error: ${message}`);
+
+      /* Access can be taken away while the page is open — the list is re-read
+         on every request. Rather than leaving a dead table on screen, drop back
+         to the gate so it says why. */
+      if (/สิทธิ์|Discord/.test(message)) {
+        setLoaded(false);
+        void refreshAccess();
+      }
     } finally {
       setBusy(false);
       setReloading(false);
     }
-  }
+  }, [log, showToast, refreshAccess]);
 
-  function doLogin() {
-    if (!auth.user) {
-      showToast('กรุณาเชื่อมต่อ Discord ก่อน', 'error');
-      return;
+  useEffect(() => {
+    void refreshAccess();
+  }, [refreshAccess]);
+
+  /* On the list: straight into the table. With the PIN field gone there is no
+     second step left for the person to click. */
+  const allowed = gate?.allowed ?? false;
+  useEffect(() => {
+    if (allowed) void loadData();
+  }, [allowed, loadData]);
+
+  async function doLogout() {
+    try {
+      await mutations.discordLogout();
+    } catch {
+      /* the cookie expires on its own; nothing useful to show */
     }
-    const value = pin.trim();
-    if (!value) {
-      showToast('กรุณากรอก PIN', 'error');
-      return;
-    }
-    void loadData(value);
+    setGate({ userId: null, allowed: false, problem: '' });
+    setLoaded(false);
+    setNamePD([]);
+    setOutDC([]);
+    auth.disconnect();
+    log('ออกจากระบบแล้ว');
   }
 
   /* Both counters read NamePD: they answer "who is still on the roster but
@@ -154,13 +186,12 @@ export function RosterManagePanel() {
   }, [outDC, searchOut]);
 
   async function updateStatus(row: number, newStatus: string) {
-    if (!sessionPin) return;
     setBusy(true);
     try {
-      const result = await mutations.setRosterStatus(row, sessionPin, newStatus);
+      const result = await mutations.setRosterStatus(row, newStatus);
       showToast(result.message, 'success');
       log(`อัปเดตสถานะ แถว ${row} → ${newStatus || 'ปกติ'}`);
-      await loadData(sessionPin);
+      await loadData();
     } catch (err) {
       showToast((err as Error).message || 'เกิดข้อผิดพลาด', 'error');
     } finally {
@@ -194,10 +225,10 @@ export function RosterManagePanel() {
     setConfirmRunning(true);
 
     try {
-      const result = await mutations.moveOut(action.row, sessionPin, action.reason);
+      const result = await mutations.moveOut(action.row, action.reason);
       showToast(result.message, 'success');
       log(`ย้ายออก: ${result.message}`);
-      await loadData(sessionPin);
+      await loadData();
     } catch (err) {
       showToast((err as Error).message || 'เกิดข้อผิดพลาด', 'error');
     } finally {
@@ -251,13 +282,26 @@ export function RosterManagePanel() {
         )}
 
         {!loaded ? (
-          <AdminLoginBox
-            auth={auth}
-            pin={pin}
-            onPinChange={setPin}
-            onSubmit={doLogin}
-            busy={busy}
-          />
+          /* Allowed but not loaded yet is the gap between the access answer and
+             the first fetch — showing the gate there would flash "no access" at
+             someone who has it. */
+          allowed ? (
+            <div className="login-box">
+              <div className="loading">กำลังโหลดข้อมูล…</div>
+            </div>
+          ) : (
+            <DiscordGate
+              loginUrl={auth.loginUrl}
+              checking={checking}
+              gate={gate}
+              failed={auth.failed}
+              displayName={auth.user?.name ?? ''}
+              avatarUrl={auth.avatarUrl}
+              sheetName="NamePD"
+              cellName="AB2"
+              onLogout={() => void doLogout()}
+            />
+          )
         ) : (
           <div>
             <div className="stats">
@@ -328,7 +372,7 @@ export function RosterManagePanel() {
                 <button
                   type="button"
                   className="btn-secondary btn-sm"
-                  onClick={() => void loadData(sessionPin)}
+                  onClick={() => void loadData()}
                   disabled={busy}
                 >
                   🔄 โหลดใหม่
@@ -436,7 +480,7 @@ export function RosterManagePanel() {
                 <button
                   type="button"
                   className="btn-secondary btn-sm"
-                  onClick={() => void loadData(sessionPin)}
+                  onClick={() => void loadData()}
                   disabled={busy}
                 >
                   🔄 โหลดใหม่
