@@ -5,7 +5,7 @@ import { mutations } from '@/lib/client/queries';
 import { useDiscordAuth } from '@/lib/client/useDiscordAuth';
 import { CopyInline } from '@/components/ui/CopyInline';
 import { DebugLog, PageToast, useDebugLog, useToastState } from './AdminShell';
-import { DiscordGate, type GateState } from './DiscordGate';
+import { DiscordGate, DiscordSessionBar, type GateState } from './DiscordGate';
 
 /* Column headers come from the Pending sheet, so they are Thai strings. */
 const COL = {
@@ -36,7 +36,7 @@ function statusClass(status: string): string {
 }
 
 export function ProctorPanel() {
-  const auth = useDiscordAuth('admin');
+  const auth = useDiscordAuth('admin', true);
   const [toast, showToast] = useToastState();
   const [logText, log] = useDebugLog();
 
@@ -207,15 +207,18 @@ export function ProctorPanel() {
               checking={checking}
               gate={gate}
               failed={auth.failed}
-              displayName={auth.user?.name ?? ''}
-              avatarUrl={auth.avatarUrl}
-              sheetName="Pending"
-              cellName="J1"
+              user={auth.user}
               onLogout={() => void doLogout()}
             />
           )
         ) : (
           <div>
+            <DiscordSessionBar
+              userId={gate?.userId ?? ''}
+              user={auth.user}
+              onLogout={() => void doLogout()}
+            />
+
             <div className="stats">
               <div className="stat-card">
                 <div className="num">{stats.total}</div>

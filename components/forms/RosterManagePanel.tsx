@@ -5,7 +5,7 @@ import { mutations } from '@/lib/client/queries';
 import { useDiscordAuth } from '@/lib/client/useDiscordAuth';
 import { CopyInline } from '@/components/ui/CopyInline';
 import { DebugLog, PageToast, useDebugLog, useToastState } from './AdminShell';
-import { DiscordGate, type GateState } from './DiscordGate';
+import { DiscordGate, DiscordSessionBar, type GateState } from './DiscordGate';
 import type { RosterMember } from '@/server/services/roster';
 
 /* The sheet stores an empty status for "still serving"; everything else is an
@@ -41,7 +41,7 @@ function statusText(status: string): string {
 const stripTag = (name: string) => name.replace(/\[MHNK-PD\]/g, '');
 
 export function RosterManagePanel() {
-  const auth = useDiscordAuth('roster');
+  const auth = useDiscordAuth('roster', true);
   const [toast, showToast] = useToastState();
   const [logText, log] = useDebugLog();
 
@@ -295,15 +295,18 @@ export function RosterManagePanel() {
               checking={checking}
               gate={gate}
               failed={auth.failed}
-              displayName={auth.user?.name ?? ''}
-              avatarUrl={auth.avatarUrl}
-              sheetName="NamePD"
-              cellName="AB2"
+              user={auth.user}
               onLogout={() => void doLogout()}
             />
           )
         ) : (
           <div>
+            <DiscordSessionBar
+              userId={gate?.userId ?? ''}
+              user={auth.user}
+              onLogout={() => void doLogout()}
+            />
+
             <div className="stats">
               <div className="stat-card">
                 <div className="num">{stats.inSystem}</div>

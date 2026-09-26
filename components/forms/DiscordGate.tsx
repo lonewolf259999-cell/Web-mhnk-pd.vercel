@@ -5,20 +5,36 @@
 /* The login box for a page gated by a Discord id allowlist rather than a PIN.
 
    Replaced AdminShell's AdminLoginBox, a two-step gate that ended in a PIN
-   field. Both admin consoles use this now; the cells their lists live in are
-   the only thing that differs, which is what `sheetName`/`cellName` carry.
+   field. Both admin consoles share this one unchanged: which list a page reads
+   is the server's business, and naming the sheet and cell here only told the
+   one person who can do nothing with them.
 
    Styling reuses each page's existing .login-box / .dc-* classes, so the gate
    looks as it did with the PIN step taken out. */
 
 import Link from 'next/link';
 import { CopyInline } from '@/components/ui/CopyInline';
+import { avatarUrlFor, type DiscordUser } from '@/lib/client/useDiscordAuth';
 import { DiscordIcon } from './DiscordIcon';
 
-/* Shown when the avatar is unknown, which is the normal case after a refresh:
-   the hash arrives in the OAuth redirect and only the id survives in the
-   cookie. An empty src would make the browser re-request the page itself. */
+/* Shown when there is no profile to draw on — a browser that has not been
+   through the OAuth redirect, or one with storage blocked. An empty src would
+   make the browser re-request the page itself. */
 const DEFAULT_AVATAR = 'https://cdn.discordapp.com/embed/avatars/0.png';
+
+/**
+ * The name and avatar to label a session with — but only when the cached
+ * profile belongs to the account the server actually verified. The cache is
+ * per-browser and survives a change of account, and labelling a session with
+ * someone else's name is worse than showing no name at all.
+ */
+function displayFor(userId: string | null, user: DiscordUser | null) {
+  const match = userId && user && user.userId === userId ? user : null;
+  return {
+    name: match?.name ?? '',
+    avatar: avatarUrlFor(match) ?? DEFAULT_AVATAR,
+  };
+}
 
 function CloseIcon() {
   return (
@@ -38,32 +54,58 @@ export interface GateState {
   problem: string;
 }
 
+/**
+ * Shown above a console once access is granted. The gate itself disappears at
+ * that point, which used to leave no way to see which account was signed in —
+ * or to leave, on a shared machine.
+ */
+export function DiscordSessionBar({
+  userId,
+  user,
+  onLogout,
+}: {
+  /** The id the server verified — the authority for who this is. */
+  userId: string;
+  /** Cached display profile, used only if it matches that id. */
+  user: DiscordUser | null;
+  onLogout: () => void;
+}) {
+  const shown = displayFor(userId, user);
+
+  return (
+    <div className="dc-bar">
+      <img className="dc-avatar" src={shown.avatar} alt="" />
+      <div className="dc-info">
+        <span className="dc-name">
+          {shown.name ? `@${shown.name}` : 'เชื่อมต่อ Discord แล้ว'}
+        </span>
+        <span className="dc-id">ID: {userId}</span>
+      </div>
+      <button type="button" className="btn-secondary btn-sm dc-bar-logout" onClick={onLogout}>
+        ออกจากระบบ
+      </button>
+    </div>
+  );
+}
+
 export function DiscordGate({
   loginUrl,
   checking,
   gate,
   failed,
-  displayName,
-  avatarUrl,
-  sheetName,
-  cellName,
+  user,
   onLogout,
 }: {
   loginUrl: string;
   checking: boolean;
   gate: GateState | null;
   failed: boolean;
-  /** From the OAuth redirect; absent after a refresh, when only the id is
-      known. Cosmetic either way — the id is what authorises. */
-  displayName: string;
-  avatarUrl: string | null;
-  /** Where whoever grants access has to paste the id — told to the person
-      being refused, so they can pass it on without having to ask. */
-  sheetName: string;
-  cellName: string;
+  /** Cached display profile. Cosmetic — the id in `gate` is what authorises. */
+  user: DiscordUser | null;
   onLogout: () => void;
 }) {
   const signedIn = gate?.userId != null;
+  const shown = displayFor(gate?.userId ?? null, user);
 
   return (
     <div className="login-box">
@@ -93,9 +135,9 @@ export function DiscordGate({
         {!checking && signedIn && (
           <div>
             <div className="dc-user">
-              <img className="dc-avatar" src={avatarUrl ?? DEFAULT_AVATAR} alt="" />
+              <img className="dc-avatar" src={shown.avatar} alt="" />
               <div className="dc-info">
-                <span className="dc-name">{displayName ? `@${displayName}` : 'บัญชี Discord'}</span>
+                <span className="dc-name">{shown.name ? `@${shown.name}` : 'บัญชี Discord'}</span>
                 <span className="dc-id">ID: {gate!.userId}</span>
               </div>
               <button
@@ -116,9 +158,7 @@ export function DiscordGate({
               {/* The id is shown either way: whatever went wrong, it is the
                   one thing the person has to hand to whoever edits the sheet. */}
               <div style={{ color: '#888' }}>
-                ส่ง Discord ID ด้านล่างให้ผู้ดูแล เพื่อเพิ่มลงในชีต{' '}
-                <strong style={{ color: '#aaa' }}>{sheetName}</strong> ช่อง{' '}
-                <strong style={{ color: '#aaa' }}>{cellName}</strong>
+                ส่ง Discord ID ด้านล่างให้ผู้ดูแล เพื่อขอ ADMIN
                 <div
                   style={{
                     marginTop: 8,
