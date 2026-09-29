@@ -5,10 +5,11 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { queries, mutations } from '@/lib/client/queries';
 import { clearApiCache } from '@/lib/client/api';
-import { clearPin, isAdminMode, openAdminSession, readPin, verifyStoredPin } from '@/lib/client/adminPin';
+import { useAdminGate } from '@/lib/client/adminAccess';
+import { useDiscordAuth } from '@/lib/client/useDiscordAuth';
 import { findOfficerWeekData, isOfficerMatch } from '@/lib/format';
 import { SiteFooter } from '@/components/SiteHeader';
-import { ConfirmModal, CopyButton, PinModal } from '@/components/ui/Modal';
+import { AdminGateModal, ConfirmModal, CopyButton } from '@/components/ui/Modal';
 import { useToast } from '@/components/ui/Toast';
 import { Loading } from '@/components/ui/States';
 import { WeekSelector } from './WeekSelector';
@@ -41,9 +42,13 @@ export function ProfileClient() {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
-  const [adminMode, setAdminMode] = useState(false);
 
-  const [pinPrompt, setPinPrompt] = useState<null | 'admin' | 'payment'>(null);
+  const gate = useAdminGate();
+  /* The officer rides along in the OAuth state so the login comes back to this
+     profile rather than to a page with nobody on it. */
+  const auth = useDiscordAuth(`profile:${encodeURIComponent(officerName)}`, true);
+  const [gateOpen, setGateOpen] = useState(false);
+
   const [confirming, setConfirming] = useState(false);
   const [paying, setPaying] = useState(false);
 
@@ -215,11 +220,6 @@ export function ProfileClient() {
     return () => clearInterval(timer);
   }, [activeWeek, loadWeek]);
 
-  useEffect(() => {
-    setAdminMode(isAdminMode());
-    void verifyStoredPin().then(setAdminMode);
-  }, []);
-
   /* ---------- payment ---------- */
 
   const selectedWeeks = useMemo(
@@ -232,7 +232,7 @@ export function ProfileClient() {
     [selectedWeeks, statuses]
   );
 
-  async function runPayment(pin: string) {
+  async function runPayment() {
     setPaying(true);
 
     let succeeded = 0;
@@ -266,7 +266,7 @@ export function ProfileClient() {
 
         try {
           const result = await mutations.markPaid(
-            { pin, weekName: week, officerName, idempotencyKey },
+            { weekName: week, officerName, idempotencyKey },
             controller.signal
           );
 
@@ -291,7 +291,6 @@ export function ProfileClient() {
           }
 
           failed++;
-          if (error.message.includes('PIN')) clearPin();
           errors.push(`${week}: ${error.message}`);
         } finally {
           clearTimeout(timer);
@@ -327,11 +326,8 @@ export function ProfileClient() {
 
   function startPayment() {
     if (selectedWeeks.length === 0) return;
-    if (readPin()) {
-      setConfirming(true);
-      return;
-    }
-    setPinPrompt('payment');
+    if (gate.allowed) setConfirming(true);
+    else setGateOpen(true);
   }
 
   /* ---------- render ---------- */
@@ -388,16 +384,9 @@ export function ProfileClient() {
           </span>
           <button
             type="button"
-            onClick={() => {
-              if (adminMode) {
-                clearPin();
-                setAdminMode(false);
-              } else {
-                setPinPrompt('admin');
-              }
-            }}
+            onClick={() => setGateOpen(true)}
             className={`cursor-pointer rounded-[6px] border px-2.5 py-1 text-[0.55rem] font-bold tracking-[0.5px] whitespace-nowrap transition ${
-              adminMode
+              gate.allowed
                 ? 'border-[#f77f07] bg-[#f77f07] text-white'
                 : 'border-[#f77f07]/30 bg-[#f77f07]/10 text-[#f77f07] hover:bg-[#f77f07]/20'
             }`}
@@ -551,21 +540,15 @@ export function ProfileClient() {
 
       <SiteFooter />
 
-      {pinPrompt && (
-        <PinModal
-          title={
-            pinPrompt === 'admin'
-              ? 'กรุณาระบุรหัสผ่านเพื่อเข้าโหมดผู้ดูแล'
-              : 'กรุณาระบุรหัสผ่านเพื่อยืนยันการจ่าย'
-          }
-          onCancel={() => setPinPrompt(null)}
-          onSubmit={() => {
-            openAdminSession();
-            const mode = pinPrompt;
-            setPinPrompt(null);
-            if (mode === 'admin') setAdminMode(true);
-            else setConfirming(true);
-          }}
+      {gateOpen && (
+        <AdminGateModal
+          checking={gate.checking}
+          userId={gate.userId}
+          allowed={gate.allowed}
+          loginUrl={auth.loginUrl}
+          failed={auth.failed}
+          onLogout={() => void gate.logout()}
+          onClose={() => setGateOpen(false)}
         />
       )}
 
@@ -577,12 +560,7 @@ export function ProfileClient() {
           onCancel={() => setConfirming(false)}
           onConfirm={() => {
             setConfirming(false);
-            const pin = readPin();
-            if (!pin) {
-              setPinPrompt('payment');
-              return;
-            }
-            void runPayment(pin);
+            void runPayment();
           }}
         />
       )}

@@ -11,12 +11,31 @@ function redirectUri(): string {
   return `${config.APP_URL.replace(/\/+$/, '')}/auth/discord/callback`;
 }
 
-/** Where to send the browser back to after auth, keyed by the state param. */
+/** Where to send the browser back to after auth, keyed by the state param.
+
+    `profile:<name>` is the one form that carries a payload: the officer whose
+    page the login started from, already percent-encoded by the caller. It is
+    checked against the characters encodeURIComponent can produce and dropped
+    if it holds anything else, so the state can only ever fill a query value —
+    never steer the path or append parameters of its own. */
 export function fallbackPage(state: string | null): string {
   if (state === 'medical') return '/medical';
   if (state === 'admin') return '/proctor';
   if (state === 'roster') return '/rostermanage';
+  if (state === 'home') return '/';
+  if (state === 'police') return '/police';
+
+  if (state?.startsWith('profile:')) {
+    const name = state.slice('profile:'.length);
+    return /^[A-Za-z0-9\-_.!~*'()%]+$/.test(name) ? `/profile?name=${name}` : '/profile';
+  }
+
   return '/register';
+}
+
+/** Adds the callback's own params to a page that may already carry some. */
+export function pageWithParams(page: string, params: string): string {
+  return `${page}${page.includes('?') ? '&' : '?'}${params}`;
 }
 
 export function authUrl(state: string): string {

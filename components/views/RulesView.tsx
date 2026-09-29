@@ -5,7 +5,6 @@ import { filterByQuery, groupByCategory } from '@/lib/format';
 import { sanitizeRichText } from '@/lib/sanitize';
 import { EmptyState, ErrorState, Loading, SectionHeader } from '@/components/ui/States';
 import { mutations } from '@/lib/client/queries';
-import { readPin } from '@/lib/client/adminPin';
 import { useToast } from '@/components/ui/Toast';
 import {
   AdminBar,
@@ -69,12 +68,6 @@ export function RulesView({
     .filter(([, entries]) => entries.length > 0);
 
   async function handleSave(fields: RuleFormFields) {
-    const pin = readPin();
-    if (!pin) {
-      toast('กรุณาเข้าโหมดผู้ดูแลก่อน', 'error');
-      return;
-    }
-
     const isEdit = modal?.mode === 'edit' && modal.item;
     const id = isEdit ? modal.item!.id : generateRuleId(type);
     const data: Record<string, string> = {
@@ -87,10 +80,10 @@ export function RulesView({
     setPending(true);
     try {
       if (isEdit) {
-        await mutations.updateRuleItem(type, id, pin, data);
+        await mutations.updateRuleItem(type, id, data);
         toast('✅ แก้ไขข้อมูลสำเร็จ', 'success');
       } else {
-        await mutations.addRuleItem(type, pin, data);
+        await mutations.addRuleItem(type, data);
         toast('✅ เพิ่มข้อมูลสำเร็จ', 'success');
       }
       setModal(null);
@@ -103,12 +96,11 @@ export function RulesView({
   }
 
   async function handleDelete() {
-    const pin = readPin();
-    if (!pin || !deleteTarget) return;
+    if (!deleteTarget) return;
 
     setPending(true);
     try {
-      await mutations.deleteRuleItem(type, deleteTarget.id, pin);
+      await mutations.deleteRuleItem(type, deleteTarget.id);
       toast('🗑️ ลบข้อมูลสำเร็จ', 'success');
       setDeleteTarget(null);
       onDataChanged();

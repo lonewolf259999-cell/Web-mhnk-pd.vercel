@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { mutations } from '@/lib/client/queries';
 import { useDiscordAuth } from '@/lib/client/useDiscordAuth';
+import { BackHome } from '@/components/ui/BackHome';
 import { CopyInline } from '@/components/ui/CopyInline';
 import { DebugLog, PageToast, useDebugLog, useToastState } from './AdminShell';
 import { DiscordGate, DiscordSessionBar, type GateState } from './DiscordGate';
@@ -191,6 +192,7 @@ export function ProctorPanel() {
   return (
     <div className="proctor-page">
       <div className="container">
+        <BackHome className="mb-2" />
         <h1>⚙️ Proctor</h1>
         <p className="subtitle">MHNK Police Department — ระบบตรวจสอบและอนุมัติใบสมัคร</p>
 

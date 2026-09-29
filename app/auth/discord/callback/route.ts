@@ -1,5 +1,10 @@
 import { NextResponse } from 'next/server';
-import { exchangeCode, fallbackPage, getUserInfo } from '@/server/services/discordAuth';
+import {
+  exchangeCode,
+  fallbackPage,
+  getUserInfo,
+  pageWithParams,
+} from '@/server/services/discordAuth';
 import { SESSION_COOKIE, SESSION_TTL_MS, createSessionToken } from '@/server/services/session';
 
 export const dynamic = 'force-dynamic';
@@ -11,7 +16,7 @@ export async function GET(request: Request) {
 
   const code = params.get('code');
   if (params.get('error') || !code) {
-    return NextResponse.redirect(new URL(`${back}?auth=failed`, request.url));
+    return NextResponse.redirect(new URL(pageWithParams(back, 'auth=failed'), request.url));
   }
 
   try {
@@ -31,7 +36,9 @@ export async function GET(request: Request) {
       auth: 'success',
     });
 
-    const response = NextResponse.redirect(new URL(`${back}?${result.toString()}`, request.url));
+    const response = NextResponse.redirect(
+      new URL(pageWithParams(back, result.toString()), request.url)
+    );
 
     // The query params above are only for what the page displays. Anything the
     // API authorises on is read from this cookie instead, which the browser
@@ -46,6 +53,6 @@ export async function GET(request: Request) {
 
     return response;
   } catch {
-    return NextResponse.redirect(new URL(`${back}?auth=failed`, request.url));
+    return NextResponse.redirect(new URL(pageWithParams(back, 'auth=failed'), request.url));
   }
 }

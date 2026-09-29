@@ -17,7 +17,6 @@ Stack: **Next.js 15 (App Router) · React 19 · TypeScript · Tailwind v4 · Ely
 | ตัวแปร | จำเป็น |
 |--------|--------|
 | `SHEET_ID`, `CASES_SHEET_ID`, `RULES_SHEET_ID` | ✅ |
-| `ADMIN_PIN` | ✅ |
 | `GOOGLE_JSON_KEY` (service-account JSON ทั้งก้อน บรรทัดเดียว) | ✅ |
 | `DISCORD_CLIENT_ID`, `DISCORD_CLIENT_SECRET` | ✅ |
 | `APP_URL` | ✅ |

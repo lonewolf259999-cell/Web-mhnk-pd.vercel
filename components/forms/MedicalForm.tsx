@@ -8,6 +8,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { mutations } from '@/lib/client/queries';
 import { useDiscordAuth } from '@/lib/client/useDiscordAuth';
 import { SiteFooter, SiteHeader } from '@/components/SiteHeader';
+import { BackHome } from '@/components/ui/BackHome';
 import {
   DiscordConnectPanel,
   DiscordIdField,
@@ -375,6 +376,7 @@ export function MedicalForm() {
 
       <main className={c.main}>
         <div className="w-full max-w-[650px]">
+          <BackHome className="mb-3" />
           {submitted ? (
             <div className={c.successCard}>
               <div className={c.successIcon}>✔</div>

@@ -58,7 +58,7 @@ await writeFile(
     'No npm install and no build are needed — dependencies are bundled.',
     '',
     'Set these environment variables on the host (see .env.example):',
-    '  SHEET_ID, CASES_SHEET_ID, RULES_SHEET_ID, ADMIN_PIN, GOOGLE_JSON_KEY,',
+    '  SHEET_ID, CASES_SHEET_ID, RULES_SHEET_ID, GOOGLE_JSON_KEY,',
     '  APP_URL, DISCORD_CLIENT_ID, DISCORD_CLIENT_SECRET,',
     '  DISCORD_REGISTER_WEBHOOK_URL, DISCORD_MEDICAL_WEBHOOK_URL,',
     '  DISCORD_PROCTOR_WEBHOOK_URL, DISCORD_OUTPD_WEBHOOK_URL',

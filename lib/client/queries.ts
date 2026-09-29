@@ -35,23 +35,13 @@ export const queries = {
 };
 
 export const mutations = {
-  refresh: (pin: string) => unwrap(client.api.refresh.post({ pin })),
+  refresh: () => unwrap(client.api.refresh.post()),
 
-  /** Is this the admin PIN? Answers without performing an admin action.
-      On success the server also sets the HttpOnly admin cookie. */
-  verifyPin: (pin: string) => unwrap(client.api.pin.verify.post({ pin })),
-
-  /** Is the admin cookie still live? Costs no PIN attempt. */
-  adminSession: () => unwrap(client.api.pin.session.get()),
-
-  /** Ends the admin session — only the server can clear an HttpOnly cookie. */
-  adminLogout: () => unwrap(client.api.pin.logout.post()),
-
-  /** Ends the Discord session, for the same reason: the cookie is HttpOnly. */
+  /** Ends the Discord session — only the server can clear an HttpOnly cookie. */
   discordLogout: () => unwrap(client.api.discord.logout.post()),
 
   markPaid: (
-    input: { pin: string; weekName: string; officerName: string; idempotencyKey?: string },
+    input: { weekName: string; officerName: string; idempotencyKey?: string },
     signal?: AbortSignal
   ) => unwrap(client.api['mark-paid'].post(input, { fetch: { signal } })),
 
@@ -84,14 +74,14 @@ export const mutations = {
   /** The signed-in account's own medical application. 404 when there is none. */
   myMedical: () => unwrap(client.api.medical.mine.get()),
 
-  /* ---- the two admin consoles ----
-     Both are gated by a Discord allowlist rather than a PIN, so nothing below
-     carries a credential: the signed session cookie rides along on its own and
-     the server matches it against the list in the sheet. The approving
-     proctor is read from that cookie too, not sent from here.
+  /* ---- admin ----
+     Every admin call is gated by a Discord allowlist rather than a PIN, so
+     nothing below carries a credential: the signed session cookie rides along
+     on its own and the server matches it against the list in the sheet. The
+     approving proctor is read from that cookie too, not sent from here.
 
-     Each console asks its access endpoint on load, because the cookie is
-     HttpOnly and the page cannot read it for itself. */
+     Each page asks its access endpoint on load, because the cookie is HttpOnly
+     and the page cannot read it for itself. */
 
   proctorAccess: () => unwrap(client.api.pending.access.get()),
 
@@ -101,7 +91,9 @@ export const mutations = {
 
   rejectPending: (row: number) => unwrap(client.api.pending.reject({ row }).post()),
 
-  rosterAccess: () => unwrap(client.api.roster.access.get()),
+  /** The one list the whole site's admin reads — /rostermanage, the
+      rules/fines/conduct editors, the payment confirmation and /police. */
+  adminAccess: () => unwrap(client.api.roster.access.get()),
 
   namePD: () => unwrap(client.api.roster.namepd.post()),
 
@@ -115,12 +107,12 @@ export const mutations = {
 
   /* ---- conduct/rules/fines admin CRUD ---- */
 
-  addRuleItem: (type: RulesType, pin: string, data: Record<string, string>) =>
-    unwrap(client.api['rules-data']({ type }).post({ pin, ...data })),
+  addRuleItem: (type: RulesType, data: Record<string, string>) =>
+    unwrap(client.api['rules-data']({ type }).post(data)),
 
-  updateRuleItem: (type: RulesType, id: string, pin: string, data: Record<string, string>) =>
-    unwrap(client.api['rules-data']({ type })({ id }).put({ pin, ...data })),
+  updateRuleItem: (type: RulesType, id: string, data: Record<string, string>) =>
+    unwrap(client.api['rules-data']({ type })({ id }).put(data)),
 
-  deleteRuleItem: (type: RulesType, id: string, pin: string) =>
-    unwrap(client.api['rules-data']({ type })({ id }).delete({ pin })),
+  deleteRuleItem: (type: RulesType, id: string) =>
+    unwrap(client.api['rules-data']({ type })({ id }).delete()),
 };

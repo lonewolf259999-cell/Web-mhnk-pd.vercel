@@ -6,7 +6,7 @@ import {
   getWeekNames,
   refreshAll,
 } from '@/server/services/sheets';
-import { requirePin } from '@/server/errors';
+import { ROSTER_MANAGE, requirePermission } from '@/server/services/permissions';
 
 /** Roster + weekly case data. */
 export const rosterRoutes = new Elysia({ name: 'roster' })
@@ -20,19 +20,12 @@ export const rosterRoutes = new Elysia({ name: 'roster' })
 
   .get('/week-top10', () => getLatestWeekTop10())
 
-  .post(
-    '/refresh',
-    async ({ body, request }) => {
-      /* request is not optional in practice: without it every caller shares
-         one lockout bucket, so ten wrong PINs from anyone lock this endpoint
-         for everybody on the instance — and the guesser stays anonymous. */
-      requirePin(body, request);
-      const officers = await refreshAll();
-      return {
-        success: true as const,
-        message: `รีเฟรชข้อมูลสำเร็จ (${officers.length} นาย)`,
-        data: { count: officers.length },
-      };
-    },
-    { body: t.Object({ pin: t.String() }) }
-  );
+  .post('/refresh', async ({ request }) => {
+    await requirePermission(request, ROSTER_MANAGE);
+    const officers = await refreshAll();
+    return {
+      success: true as const,
+      message: `รีเฟรชข้อมูลสำเร็จ (${officers.length} นาย)`,
+      data: { count: officers.length },
+    };
+  });

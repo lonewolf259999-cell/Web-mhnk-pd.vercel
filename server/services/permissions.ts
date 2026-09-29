@@ -1,11 +1,16 @@
 /* Page access lists kept in the spreadsheet — a Discord id allowlist.
 
-   /rostermanage used to be gated by ADMIN_PIN: one shared code that opened
-   every admin endpoint at once, could not say who had used it, and had to be
-   changed and redistributed to take access away from a single person. The gate
-   is now the signed Discord session cookie plus a list of user ids held in the
-   sheet, so access is granted or revoked by editing one cell and every write
-   is attributable to a named account.
+   Everything administrative used to be gated by ADMIN_PIN: one shared code
+   that opened every admin endpoint at once, could not say who had used it, and
+   had to be changed and redistributed to take access away from a single
+   person. The gate is now the signed Discord session cookie plus a list of
+   user ids held in the sheet, so access is granted or revoked by editing one
+   cell and every write is attributable to a named account.
+
+   ROSTER_MANAGE below is that list for the whole site, not just its own
+   console: the rules/fines/conduct editors, the payment confirmation and
+   /police read it too, because the same handful of people do all of it. A
+   separate group would mean a second PermissionSource, not a second reader.
 
    The list is not a credential. Knowing an allowed id grants nothing, because
    the id has to come from a Discord login this server verified (see
@@ -37,7 +42,7 @@ export interface PermissionSource {
   readonly fallback: string;
 }
 
-/** Where the /rostermanage list lives: NamePD!AA2 holds the key, AB2 the ids.
+/** Where the site's admin list lives: NamePD!AA2 holds the key, AB2 the ids.
     Positional like the rest of the sheet layer — moving those two cells breaks
     this, which is why the key cell is verified rather than assumed. */
 export const ROSTER_MANAGE: PermissionSource = {

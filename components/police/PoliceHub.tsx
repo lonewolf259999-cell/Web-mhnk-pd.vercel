@@ -1,14 +1,11 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useState } from 'react';
 import { SiteFooter, SiteHeader } from '@/components/SiteHeader';
-import { PinField, PIN_LENGTH } from '@/components/ui/PinField';
-import { usePinCheck } from '@/components/ui/Modal';
-import { clearPin, isAdminMode, openAdminSession, verifyStoredPin } from '@/lib/client/adminPin';
-
-/** 'checking' exists so a remembered PIN never flashes the lock screen. */
-type Gate = 'checking' | 'locked' | 'open';
+import { CopyButton } from '@/components/ui/Modal';
+import { DiscordIcon } from '@/components/forms/DiscordIcon';
+import { useAdminGate } from '@/lib/client/adminAccess';
+import { useDiscordAuth } from '@/lib/client/useDiscordAuth';
 
 interface Entry {
   href: string;
@@ -57,29 +54,23 @@ const GROUPS: { label: string; entries: Entry[] }[] = [
 ];
 
 export function PoliceHub() {
-  const [gate, setGate] = useState<Gate>('checking');
-
-  /* A PIN in storage opens the page immediately and is re-checked against the
-     server behind it — so arriving from the home page costs no extra wait,
-     and a PIN that has since changed still closes the gate. */
-  useEffect(() => {
-    if (isAdminMode()) setGate('open');
-    void verifyStoredPin().then((valid) => setGate(valid ? 'open' : 'locked'));
-  }, []);
+  const gate = useAdminGate();
+  const auth = useDiscordAuth('police', true);
 
   return (
     <div className="flex min-h-screen flex-col">
       <SiteHeader />
 
-      {gate === 'open' ? (
-        <Hub
-          onLock={() => {
-            clearPin();
-            setGate('locked');
-          }}
-        />
+      {gate.allowed ? (
+        <Hub onLogout={() => void gate.logout()} />
       ) : (
-        <PinGate checking={gate === 'checking'} onUnlock={() => setGate('open')} />
+        <AccessGate
+          checking={gate.checking}
+          userId={gate.userId}
+          loginUrl={auth.loginUrl}
+          failed={auth.failed}
+          onLogout={() => void gate.logout()}
+        />
       )}
 
       <SiteFooter />
@@ -87,12 +78,19 @@ export function PoliceHub() {
   );
 }
 
-function PinGate({ checking, onUnlock }: { checking: boolean; onUnlock: () => void }) {
-  const pinCheck = usePinCheck(() => {
-    openAdminSession();
-    onUnlock();
-  });
-
+function AccessGate({
+  checking,
+  userId,
+  loginUrl,
+  failed,
+  onLogout,
+}: {
+  checking: boolean;
+  userId: string | null;
+  loginUrl: string;
+  failed: boolean;
+  onLogout: () => void;
+}) {
   if (checking) {
     return (
       <main className="flex flex-1 items-center justify-center px-4 py-10">
@@ -106,62 +104,76 @@ function PinGate({ checking, onUnlock }: { checking: boolean; onUnlock: () => vo
 
   return (
     <main className="flex flex-1 items-center justify-center px-4 py-10">
-      <form
-        onSubmit={(e) => {
-          e.preventDefault();
-          void pinCheck.submit(pinCheck.pin);
-        }}
-        className="w-full max-w-sm rounded-[16px] border border-accent/20 bg-[rgba(17,24,39,0.85)] p-7 text-center shadow-[0_20px_60px_rgba(0,0,0,0.45)]"
-      >
+      <div className="w-full max-w-sm rounded-[16px] border border-accent/20 bg-[rgba(17,24,39,0.85)] p-7 text-center shadow-[0_20px_60px_rgba(0,0,0,0.45)]">
         <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full border border-[#f77f07]/30 bg-[#f77f07]/10 text-2xl">
           🔐
         </div>
 
         <h1 className="text-[1.05rem] font-bold text-ink">พื้นที่เฉพาะเจ้าหน้าที่</h1>
-        <p className="mt-1.5 mb-6 text-[0.75rem] leading-relaxed text-ink-dim">
-          ใส่ PIN {PIN_LENGTH} หลัก เพื่อเข้าศูนย์รวมระบบตำรวจ
-        </p>
 
-        <PinField
-          value={pinCheck.pin}
-          onChange={pinCheck.change}
-          onComplete={(value) => void pinCheck.submit(value)}
-          wrong={Boolean(pinCheck.error)}
-          label="PIN ผู้ดูแล"
-        />
+        {userId ? (
+          <>
+            <p className="mt-1.5 text-[0.75rem] leading-relaxed text-ink-dim">
+              บัญชีนี้ยังไม่มีสิทธิ์เข้าศูนย์รวมระบบตำรวจ
+              <br />
+              ส่ง Discord ID ด้านล่างให้ผู้ดูแล เพื่อขอสิทธิ์
+            </p>
 
-        {/* The slot reserves its height so a rejected PIN never nudges the
-            buttons down and out from under the cursor. */}
-        <p
-          role="alert"
-          className={`mt-3 min-h-[1.25rem] text-sm font-medium text-danger transition-opacity ${
-            pinCheck.error ? 'opacity-100' : 'opacity-0'
-          }`}
-        >
-          {pinCheck.error ? `❌ ${pinCheck.error}` : ''}
-        </p>
+            <div className="mt-4 flex items-center gap-2 rounded-md border border-accent/20 bg-black/30 px-3 py-2">
+              <code className="min-w-0 flex-1 truncate text-left text-xs text-ink">{userId}</code>
+              <CopyButton value={userId} label="คัดลอก Discord ID" />
+            </div>
 
-        <div className="mt-3 flex gap-2.5">
-          <Link
-            href="/"
-            className="flex-1 rounded-sm bg-white/10 py-2.5 text-center text-sm font-semibold text-ink-dim transition hover:bg-white/15"
-          >
-            ← กลับหน้าหลัก
-          </Link>
-          <button
-            type="submit"
-            disabled={pinCheck.pin.length < PIN_LENGTH || pinCheck.checking}
-            className="flex-1 cursor-pointer rounded-sm bg-[#f77f07] py-2.5 text-sm font-semibold text-night transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-40"
-          >
-            {pinCheck.checking ? 'กำลังตรวจสอบ...' : 'ยืนยัน'}
-          </button>
-        </div>
-      </form>
+            <div className="mt-4 flex gap-2.5">
+              <Link
+                href="/"
+                className="flex-1 rounded-sm bg-white/10 py-2.5 text-center text-sm font-semibold text-ink-dim transition hover:bg-white/15"
+              >
+                ← กลับหน้าหลัก
+              </Link>
+              <button
+                type="button"
+                onClick={onLogout}
+                className="flex-1 cursor-pointer rounded-sm bg-white/10 py-2.5 text-sm font-semibold text-ink-dim transition hover:bg-white/15"
+              >
+                ออกจากระบบ
+              </button>
+            </div>
+          </>
+        ) : (
+          <>
+            <p className="mt-1.5 mb-5 text-[0.75rem] leading-relaxed text-ink-dim">
+              เชื่อมต่อ Discord เพื่อเข้าศูนย์รวมระบบตำรวจ
+            </p>
+
+            <Link
+              href={loginUrl}
+              className="flex w-full items-center justify-center gap-2 rounded-sm bg-[#5865f2] py-2.5 text-sm font-semibold text-white transition hover:brightness-110"
+            >
+              <DiscordIcon size={18} />
+              เชื่อมต่อ Discord
+            </Link>
+
+            {failed && (
+              <p role="alert" className="mt-3 text-sm font-medium text-danger">
+                ❌ เชื่อมต่อ Discord ไม่สำเร็จ กรุณาลองอีกครั้ง
+              </p>
+            )}
+
+            <Link
+              href="/"
+              className="mt-3 block w-full rounded-sm bg-white/10 py-2.5 text-center text-sm font-semibold text-ink-dim transition hover:bg-white/15"
+            >
+              ← กลับหน้าหลัก
+            </Link>
+          </>
+        )}
+      </div>
     </main>
   );
 }
 
-function Hub({ onLock }: { onLock: () => void }) {
+function Hub({ onLogout }: { onLogout: () => void }) {
   return (
     <main className="mx-auto w-full max-w-[860px] flex-1 px-4 py-6 lg:px-6">
       <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
@@ -174,10 +186,10 @@ function Hub({ onLock }: { onLock: () => void }) {
 
         <button
           type="button"
-          onClick={onLock}
+          onClick={onLogout}
           className="cursor-pointer rounded-[6px] border border-[#f77f07]/30 bg-[#f77f07]/10 px-2.5 py-1.5 text-[0.7rem] font-bold tracking-[0.5px] text-[#f77f07] transition hover:bg-[#f77f07]/20"
         >
-          🔓 ปลดล็อกแล้ว — กดเพื่อล็อก
+          🔓 ผู้ดูแล — ออกจากระบบ
         </button>
       </div>
 

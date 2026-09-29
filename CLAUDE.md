@@ -59,34 +59,36 @@ Large read-only sheets come through Google's GViz CSV export; writes and the rul
 - `server/services/cache.ts`, `paymentStore.ts`, and `server/rateLimit.ts` are **instance-local**. Multiple Vercel instances do not share them — rate limits and idempotency keys throttle/dedupe per-instance, not globally.
 - Long-running work at module scope runs on every cold start; avoid adding any.
 
-### PIN auth: constant-time check plus a lockout
+### Rate limiting
 
-`server/errors.ts`'s `requirePin` compares the submitted PIN with `crypto.timingSafeEqual` (not `!==`) and tracks wrong attempts per client (via `server/rateLimit.ts`'s `clientKey`, best-effort from `X-Forwarded-For`), throwing 429 after 10 wrong attempts in 15 minutes. Every route that calls `requirePin` must pass its Elysia `request` object through — `requirePin(body, request)` — or lockout falls back to a single shared bucket for the whole instance.
+`/register` and `/medical` are both rate-limited (10/min per client) via `rateLimit()` in `server/rateLimit.ts`, keyed by `clientKey` (best-effort from `X-Forwarded-For`) — apply the same call to any new public submission endpoint.
 
-`/register` and `/medical` are both rate-limited (10/min per client) via the same `rateLimit()` helper — apply the same call to any new public submission endpoint.
+### Everything administrative authorises on a Discord allowlist. There is no PIN
 
-### The two admin consoles authorise on a Discord allowlist, not the PIN
+`server/services/permissions.ts` is the only admin gate: the verified Discord id from the session cookie has to appear in a list the spreadsheet holds in two cells — the left one naming the list, the right one holding the ids (any separator, `<@id>` tolerated).
 
-`server/services/permissions.ts` gates both instead: the verified Discord id from the session cookie has to appear in a list the spreadsheet holds in two cells — the left one naming the list, the right one holding the ids (any separator, `<@id>` tolerated).
+| list | gates | routes | key cell | ids cell | key |
+|---|---|---|---|---|---|
+| `ROSTER_MANAGE` | `/rostermanage`, `/police`, the rules/fines/conduct CRUD, `/mark-paid`, `/refresh` | `routes/rosterAdmin.ts`, `rules.ts`, `admin.ts`, `roster.ts` | `NamePD!AA2` | `AB2` | `ROSTERMANAGE_IDDC` |
+| `PROCTOR` | `/proctor` | `routes/pending.ts` | `Pending!L1` | `M1` | `PROCTOR_IDDC` |
 
-| page | routes | key cell | ids cell | key |
-|---|---|---|---|---|
-| `/rostermanage` | `routes/rosterAdmin.ts` | `NamePD!AA2` | `AB2` | `ROSTERMANAGE_IDDC` |
-| `/proctor` | `routes/pending.ts` | `Pending!L1` | `M1` | `PROCTOR_IDDC` |
+`ROSTER_MANAGE` is the site-wide admin list, not just its own console's: the same handful of people do all of it, so they are one list by choice rather than by accident. A group that should *not* overlap means adding a `PermissionSource`, not a second reader.
 
-Adding a third console means adding a `PermissionSource`, not a second reader. `requirePermission` returns the actor's id, so a write can be attributed — the thing one shared PIN never could, and what `/pending/approve` now records as the proctor instead of believing an id sent in the body.
+`requirePermission` returns the actor's id, so a write can be attributed — the thing one shared PIN never could. `/pending/approve` records it as the proctor instead of believing an id sent in the body, and `/mark-paid` logs who confirmed a payment.
 
 Consequences worth knowing before changing it:
 
-- **The list is not a credential.** An id only works for whoever can log into that Discord account, which is why it is safe in a sheet other people can read. `ADMIN_PIN` would not be — never move it there.
+- **The list is not a credential.** An id only works for whoever can log into that Discord account, which is why it is safe in a sheet other people can read. A PIN would not be — never put one there, and note that removing `ADMIN_PIN` is what makes that distinction moot rather than merely observed.
 - Read through the Sheets API, not GViz: the GViz export is CDN-cached, so a revoked id would keep working for minutes.
-- Those two cells are positional like the rest of the sheet layer, so the key cell is **verified** rather than assumed. An inserted row reports itself instead of silently reading whatever slid into AA2.
+- Those cells are positional like the rest of the sheet layer, so the key cell is **verified** rather than assumed. An inserted row reports itself instead of silently reading whatever slid into AA2.
 - Keep them clear of the data range. The proctor pair started at `I1/J1` and had to move to `L1/M1` the moment column I became a data column: a config cell inside the range arrives as a column header and ships the allowlist to the browser with every row.
 - The diagnostic in `problem` names the sheet and the cell, so it is returned **only alongside `allowed`** and logged server-side. A refused caller is told nothing about where the list lives.
-- `ROSTERMANAGE_IDDC` and `PROCTOR_IDDC` in the environment are standby lists, merged in on every path including the failure ones. They are what stops a mistyped cell from locking the last admin out of the page that edits that cell. They do not help if Discord OAuth itself breaks — nothing short of a non-Discord gate would.
-- Each page asks its `access` endpoint on load because the session cookie is HttpOnly. Without that call a refresh looks like a logout.
+- `ROSTERMANAGE_IDDC` and `PROCTOR_IDDC` in the environment are standby lists, merged in on every path including the failure ones. They are what stops a mistyped cell from locking the last admin out of the page that edits that cell. They do not help if Discord OAuth itself breaks — and now that the PIN is gone, nothing else does either. That was the accepted cost of one attributable gate.
+- Every page asks its `access` endpoint on load because the session cookie is HttpOnly. Without that call a refresh looks like a logout. On the public pages the call is cheap: with no session cookie the server answers without reading the sheet.
 
-`ADMIN_PIN` still guards `/refresh`, `/mark-paid` and the rules/fines/conduct CRUD, so `requirePin` and the admin cookie are still live — they are simply no longer what stands between anyone and the roster.
+On the client, `lib/client/adminAccess.ts`'s `useAdminGate()` is what pages ask. It keeps two facts apart deliberately: `allowed` (may this account edit) and a 30-minute localStorage flag (has the person switched editing on). The Discord session lasts a week, so without the second flag an admin would find edit controls on every page for days — the one thing the PIN session got right, by expiring. Neither flag authorises anything; the server re-reads the list on every call.
+
+Returning from Discord OAuth to a page that carries its own query is why `fallbackPage` accepts `profile:<name>` and why `pageWithParams` exists — a login started from a profile has to come back to that officer, not to an empty profile page.
 
 ### Editing an application does not need its Discord message id
 
@@ -120,7 +122,7 @@ The GViz export is CDN-cached, so re-reading a week immediately after marking it
 
 ## Configuration
 
-`SHEET_ID`, `CASES_SHEET_ID`, `RULES_SHEET_ID` and `ADMIN_PIN` are lazy getters in `server/config.ts` that throw when unset. A missing variable surfaces as a 500 naming the variable on the first request that needs it, not as a boot failure — so the site renders and only the affected endpoints fail. See `.env.example` for the full variable list.
+`SHEET_ID`, `CASES_SHEET_ID` and `RULES_SHEET_ID` are lazy getters in `server/config.ts` that throw when unset. A missing variable surfaces as a 500 naming the variable on the first request that needs it, not as a boot failure — so the site renders and only the affected endpoints fail. See `.env.example` for the full variable list.
 
 `GOOGLE_JSON_KEY` holds the entire service-account JSON as a single-line string. A panel that writes environment variables into `.htaccess` as `SetEnv` truncates a value that long at its first space, which surfaces as `GOOGLE_JSON_KEY is not valid JSON` — there, leave it unset and point `GOOGLE_APPLICATION_CREDENTIALS` at the JSON file instead, keeping that file outside the web-served directory.
 

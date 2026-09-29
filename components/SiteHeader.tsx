@@ -13,7 +13,6 @@ export function SiteHeader({
   unit = 'กรมตำรวจ',
   badge = '⚖ POLICE',
   badgeHref,
-  onBadgeClick,
   badgeTitle,
 }: {
   children?: React.ReactNode;
@@ -24,8 +23,6 @@ export function SiteHeader({
   badge?: string;
   /** Turns the department badge into a link. Left unset it stays a plain label. */
   badgeHref?: string;
-  /** Lets the caller gate that link — e.g. ask for the PIN before leaving. */
-  onBadgeClick?: (e: React.MouseEvent<HTMLAnchorElement>) => void;
   badgeTitle?: string;
 }) {
   return (
@@ -54,7 +51,6 @@ export function SiteHeader({
           {badgeHref ? (
             <Link
               href={badgeHref}
-              onClick={onBadgeClick}
               title={badgeTitle}
               className={`${BADGE_CLASS} cursor-pointer transition hover:-translate-y-px hover:border-accent/60 hover:bg-accent/20 hover:shadow-[0_0_14px_rgba(29,201,183,0.25)]`}
             >

@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { authUrl, fallbackPage } from '@/server/services/discordAuth';
+import { authUrl, fallbackPage, pageWithParams } from '@/server/services/discordAuth';
 
 export const dynamic = 'force-dynamic';
 
@@ -9,9 +9,7 @@ export function GET(request: Request) {
   try {
     return NextResponse.redirect(authUrl(state));
   } catch {
-    const back = fallbackPage(state);
-    return NextResponse.redirect(
-      new URL(`${back}?auth=failed&error=discord_not_configured`, request.url)
-    );
+    const back = pageWithParams(fallbackPage(state), 'auth=failed&error=discord_not_configured');
+    return NextResponse.redirect(new URL(back, request.url));
   }
 }

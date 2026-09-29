@@ -5,6 +5,7 @@ import { mutations } from '@/lib/client/queries';
 import { useDiscordAuth } from '@/lib/client/useDiscordAuth';
 import { useToast } from '@/components/ui/Toast';
 import { SiteFooter, SiteHeader } from '@/components/SiteHeader';
+import { BackHome } from '@/components/ui/BackHome';
 import {
   DiscordConnectPanel,
   DiscordIdField,
@@ -216,6 +217,7 @@ export function RegisterForm() {
         <SiteHeader />
         <main className={c.main}>
           <div className="w-full max-w-[600px]">
+            <BackHome className="mb-3" />
             <div className={c.successCard}>
               <div className={c.successIcon}>✔</div>
               <h2 className={c.successTitle}>สมัครสำเร็จ!</h2>
@@ -276,6 +278,7 @@ export function RegisterForm() {
 
       <main className={c.main}>
         <div className="w-full max-w-[600px]">
+          <BackHome className="mb-3" />
           <div className={c.card}>
             <div className={c.header}>
               <div className={c.headerIcon}>⚖</div>

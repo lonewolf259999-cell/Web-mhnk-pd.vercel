@@ -62,6 +62,18 @@ export function avatarUrlFor(user: DiscordUser | null): string | null {
     : 'https://cdn.discordapp.com/embed/avatars/0.png';
 }
 
+/** What the OAuth callback appends. Removed by name rather than by clearing
+    the query outright: a profile page carries the officer in `?name=`, and
+    wiping it would leave a refresh on a page with nobody on it. */
+const AUTH_PARAMS = [
+  'auth',
+  'error',
+  'discord_id',
+  'discord_userId',
+  'discord_name',
+  'discord_avatar',
+];
+
 /**
  * Reads the Discord identity the OAuth callback appended to the URL, then
  * strips those params so a refresh or shared link cannot replay them.
@@ -97,7 +109,9 @@ export function useDiscordAuth(state: string, persist = false): DiscordAuthState
       setFailed(true);
     }
 
-    window.history.replaceState({}, document.title, window.location.pathname);
+    const url = new URL(window.location.href);
+    for (const key of AUTH_PARAMS) url.searchParams.delete(key);
+    window.history.replaceState({}, document.title, `${url.pathname}${url.search}`);
   }, [persist]);
 
   const disconnect = useCallback(() => {

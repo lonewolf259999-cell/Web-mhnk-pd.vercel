@@ -1,6 +1,7 @@
 import { Elysia, t } from 'elysia';
 import { addRule, deleteRule, getCases, getRulesData, updateRule } from '@/server/services/sheets';
-import { ApiError, requirePin } from '@/server/errors';
+import { ApiError } from '@/server/errors';
+import { ROSTER_MANAGE, requirePermission } from '@/server/services/permissions';
 import type { RulesType } from '@/lib/types';
 
 const WRITE_TYPES = ['conduct', 'rules', 'fines'] as const;
@@ -14,7 +15,6 @@ function assertWritable(type: string): RulesType {
 
 /** Payload shared by add/update — only `id` is structurally required. */
 const rulePayload = t.Object({
-  pin: t.String(),
   id: t.Optional(t.String()),
   title: t.Optional(t.String()),
   category: t.Optional(t.String()),
@@ -51,11 +51,12 @@ export const rulesRoutes = new Elysia({ name: 'rules' })
   .post(
     '/rules-data/:type',
     async ({ params, body, request }) => {
-      requirePin(body, request);
+      const actor = await requirePermission(request, ROSTER_MANAGE);
       const type = assertWritable(params.type);
       if (!body.id) throw new ApiError('Missing required field: id', 400);
 
       const result = await addRule(type, toRow(body, body.id));
+      console.log(`[rules] ${actor} add ${type} ${body.id}`);
       return { success: true as const, message: 'เพิ่มข้อมูลสำเร็จ', data: result };
     },
     { params: t.Object({ type: t.String() }), body: rulePayload }
@@ -64,10 +65,11 @@ export const rulesRoutes = new Elysia({ name: 'rules' })
   .put(
     '/rules-data/:type/:id',
     async ({ params, body, request }) => {
-      requirePin(body, request);
+      const actor = await requirePermission(request, ROSTER_MANAGE);
       const type = assertWritable(params.type);
 
       const result = await updateRule(type, params.id, toRow(body, params.id));
+      console.log(`[rules] ${actor} edit ${type} ${params.id}`);
       return { success: true as const, message: 'แก้ไขข้อมูลสำเร็จ', data: result };
     },
     { params: t.Object({ type: t.String(), id: t.String() }), body: rulePayload }
@@ -75,15 +77,13 @@ export const rulesRoutes = new Elysia({ name: 'rules' })
 
   .delete(
     '/rules-data/:type/:id',
-    async ({ params, body, request }) => {
-      requirePin(body, request);
+    async ({ params, request }) => {
+      const actor = await requirePermission(request, ROSTER_MANAGE);
       const type = assertWritable(params.type);
 
       const result = await deleteRule(type, params.id);
+      console.log(`[rules] ${actor} delete ${type} ${params.id}`);
       return { success: true as const, message: 'ลบข้อมูลสำเร็จ', data: result };
     },
-    {
-      params: t.Object({ type: t.String(), id: t.String() }),
-      body: t.Object({ pin: t.String() }),
-    }
+    { params: t.Object({ type: t.String(), id: t.String() }) }
   );

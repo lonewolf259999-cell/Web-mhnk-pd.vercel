@@ -18,9 +18,6 @@ export const config = {
   get RULES_SHEET_ID() {
     return required('RULES_SHEET_ID');
   },
-  get ADMIN_PIN() {
-    return required('ADMIN_PIN');
-  },
 
   CASES_DATA_SHEET_ID:
     process.env.CASES_DATA_SHEET_ID || '1grpNtG3sa9UoSwmTU3tY7-FOZQEHcMvL-Vu_1ipULlI',

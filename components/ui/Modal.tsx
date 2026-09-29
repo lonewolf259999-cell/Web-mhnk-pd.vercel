@@ -1,9 +1,8 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { mutations } from '@/lib/client/queries';
-import { PinField, PIN_LENGTH } from './PinField';
+import { DiscordIcon } from '@/components/forms/DiscordIcon';
 
 function Backdrop({ onClose, children }: { onClose: () => void; children: React.ReactNode }) {
   useEffect(() => {
@@ -31,128 +30,118 @@ function Backdrop({ onClose, children }: { onClose: () => void; children: React.
 }
 
 /**
- * Checks a PIN against the server, then hands it to `onSubmit`. The check
- * happens before the prompt closes — otherwise a wrong code looks accepted
- * until the first admin action fails.
+ * The ♛ Admin badge's one panel: who this browser is signed in as, whether
+ * that account may edit, and the way in or out. It replaced the PIN prompt,
+ * which could only ask a question and never answer one.
  *
- * Returns `null` on success so callers can `await` a shared gate; the hook is
- * only the plumbing, the markup belongs to whoever renders the field.
+ * A refused account is shown its Discord id, because that is the one thing it
+ * has to hand to whoever keeps the list — never where the list is kept.
+ *
+ * `onToggleAdminMode` is passed only by a page that has edit controls to
+ * reveal. The profile page has none: there, being on the list is the whole
+ * permission and the toggle would gate nothing.
  */
-export function usePinCheck(onSubmit: (pin: string) => void) {
-  const [pin, setPin] = useState('');
-  const [checking, setChecking] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  const submit = useCallback(
-    async (candidate: string) => {
-      if (!candidate || checking) return;
-
-      setChecking(true);
-      setError(null);
-
-      try {
-        const result = await mutations.verifyPin(candidate);
-        if (!result.valid) {
-          setError(result.message);
-          setChecking(false);
-          setPin(''); // wrong code: clear the slots so the next attempt is typed fresh
-          return;
-        }
-      } catch (err) {
-        // Locked out, PIN not configured, or the request never landed.
-        setError((err as Error).message);
-        setChecking(false);
-        setPin('');
-        return;
-      }
-
-      onSubmit(candidate);
-    },
-    [checking, onSubmit]
+export function AdminGateModal({
+  checking,
+  userId,
+  allowed,
+  loginUrl,
+  failed = false,
+  adminMode = false,
+  onToggleAdminMode,
+  onLogout,
+  onClose,
+}: {
+  checking: boolean;
+  /** The id the server verified, or null when this browser is signed out. */
+  userId: string | null;
+  allowed: boolean;
+  loginUrl: string;
+  /** The last Discord round trip came back as a failure. */
+  failed?: boolean;
+  adminMode?: boolean;
+  onToggleAdminMode?: (on: boolean) => void;
+  onLogout: () => void;
+  onClose: () => void;
+}) {
+  const logoutButton = (
+    <button
+      type="button"
+      onClick={onLogout}
+      className="w-full cursor-pointer rounded-sm bg-white/10 py-2.5 text-sm font-semibold text-ink-dim transition hover:bg-white/15"
+    >
+      ออกจากระบบ Discord
+    </button>
   );
 
-  const change = useCallback((next: string) => {
-    setPin(next);
-    setError(null);
-  }, []);
-
-  return { pin, change, submit, checking, error };
-}
-
-export function PinModal({
-  title = 'กรุณาระบุรหัสผ่าน',
-  onSubmit,
-  onCancel,
-  /** Shown instead of a plain cancel when there is nowhere to fall back to. */
-  backHref,
-}: {
-  title?: string;
-  onSubmit: (pin: string) => void;
-  onCancel: () => void;
-  backHref?: string;
-}) {
-  const { pin, change, submit, checking, error } = usePinCheck(onSubmit);
+  const idBox = (
+    <div className="flex items-center gap-2 rounded-md border border-accent/20 bg-black/30 px-3 py-2">
+      <code className="min-w-0 flex-1 truncate text-xs text-ink">{userId}</code>
+      <CopyButton value={userId ?? ''} label="คัดลอก Discord ID" />
+    </div>
+  );
 
   return (
-    <Backdrop onClose={onCancel}>
-      <form
-        onSubmit={(e) => {
-          e.preventDefault();
-          void submit(pin);
-        }}
-      >
-        <div className="mb-4 flex items-center justify-between gap-3">
-          <h3 className="text-base font-bold text-[#f77f07]">🔐 {title}</h3>
-          <button
-            type="button"
-            onClick={onCancel}
-            aria-label="ปิด"
-            className="cursor-pointer text-xl leading-none text-ink-dim hover:text-ink"
+    <Backdrop onClose={onClose}>
+      <div className="mb-4 flex items-center justify-between gap-3">
+        <h3 className="text-base font-bold text-[#f77f07]">🔐 โหมดผู้ดูแล</h3>
+        <button
+          type="button"
+          onClick={onClose}
+          aria-label="ปิด"
+          className="cursor-pointer text-xl leading-none text-ink-dim hover:text-ink"
+        >
+          ×
+        </button>
+      </div>
+
+      {checking ? (
+        <p className="py-4 text-center text-sm text-ink-dim">กำลังตรวจสอบสิทธิ์...</p>
+      ) : !userId ? (
+        <div className="space-y-3 text-sm">
+          <p className="text-ink-dim">เชื่อมต่อ Discord เพื่อตรวจสอบสิทธิ์ผู้ดูแล</p>
+
+          <Link
+            href={loginUrl}
+            className="flex w-full items-center justify-center gap-2 rounded-sm bg-[#5865f2] py-2.5 text-sm font-semibold text-white transition hover:brightness-110"
           >
-            ×
-          </button>
+            <DiscordIcon size={18} />
+            เชื่อมต่อ Discord
+          </Link>
+
+          {failed && (
+            <p role="alert" className="text-center text-sm font-medium text-danger">
+              ❌ เชื่อมต่อ Discord ไม่สำเร็จ กรุณาลองอีกครั้ง
+            </p>
+          )}
         </div>
+      ) : !allowed ? (
+        <div className="space-y-3 text-sm">
+          <p className="font-semibold text-danger">⛔ บัญชีนี้ยังไม่มีสิทธิ์ผู้ดูแล</p>
+          <p className="text-ink-dim">ส่ง Discord ID ด้านล่างให้ผู้ดูแล เพื่อขอสิทธิ์</p>
+          {idBox}
+          {logoutButton}
+        </div>
+      ) : (
+        <div className="space-y-3 text-sm">
+          <p className="font-semibold text-success">✅ เข้าสู่ระบบในฐานะผู้ดูแล</p>
+          {idBox}
 
-        <PinField
-          value={pin}
-          onChange={change}
-          onComplete={(value) => void submit(value)}
-          wrong={Boolean(error)}
-          label={title}
-        />
-
-        {error && (
-          <p role="alert" className="mt-3 text-center text-sm font-medium text-danger">
-            ❌ {error}
-          </p>
-        )}
-
-        <div className="mt-4 flex gap-2.5">
-          {backHref ? (
-            <Link
-              href={backHref}
-              className="flex-1 rounded-sm bg-white/10 py-2.5 text-center text-sm font-semibold text-ink-dim transition hover:bg-white/15"
-            >
-              ← กลับหน้าหลัก
-            </Link>
-          ) : (
+          {onToggleAdminMode && (
             <button
               type="button"
-              onClick={onCancel}
-              className="flex-1 cursor-pointer rounded-sm bg-white/10 py-2.5 text-sm font-semibold text-ink-dim transition hover:bg-white/15"
+              onClick={() => onToggleAdminMode(!adminMode)}
+              className={`w-full cursor-pointer rounded-sm py-2.5 text-sm font-semibold transition hover:brightness-110 ${
+                adminMode ? 'bg-white/10 text-ink-dim' : 'bg-[#f77f07] text-night'
+              }`}
             >
-              ยกเลิก
+              {adminMode ? 'ปิดโหมดแก้ไข' : 'เปิดโหมดแก้ไข'}
             </button>
           )}
-          <button
-            type="submit"
-            disabled={pin.length < PIN_LENGTH || checking}
-            className="flex-1 cursor-pointer rounded-sm bg-[#f77f07] py-2.5 text-sm font-semibold text-night transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-40"
-          >
-            {checking ? 'กำลังตรวจสอบ...' : 'ยืนยัน'}
-          </button>
+
+          {logoutButton}
         </div>
-      </form>
+      )}
     </Backdrop>
   );
 }

@@ -7,72 +7,16 @@ import {
   markProcessing,
   setPaymentResult,
 } from '@/server/services/paymentStore';
-import { ApiError, requirePin } from '@/server/errors';
-import {
-  ADMIN_TTL_MS,
-  adminCookieHeader,
-  createAdminToken,
-  readAdminSession,
-  sessionCookieHeader,
-} from '@/server/services/session';
+import { ApiError } from '@/server/errors';
+import { ROSTER_MANAGE, requirePermission } from '@/server/services/permissions';
+import { sessionCookieHeader } from '@/server/services/session';
 
 export const adminRoutes = new Elysia({ name: 'admin' })
   .get('/schedule-config', () => scheduleConfig)
 
-  /* Checks a PIN and does nothing else, so the PIN prompt can reject a wrong
-     code where it is typed instead of on the first real action. A wrong PIN
-     is an answer rather than a failure — a lockout or an unset ADMIN_PIN
-     still surfaces as an error, because those are not "try again". Attempts
-     count toward requirePin's lockout exactly like any other admin call. */
-  .post(
-    '/pin/verify',
-    ({ body, request, set }) => {
-      const secure = new URL(request.url).protocol === 'https:';
-
-      try {
-        requirePin(body, request);
-      } catch (err) {
-        if (err instanceof ApiError && err.status === 401) {
-          // Drop any stale cookie so a wrong PIN also ends the old session.
-          set.headers['set-cookie'] = adminCookieHeader('', 0, secure);
-          return { valid: false, message: err.message };
-        }
-        throw err;
-      }
-
-      /* Hand back a short-lived HttpOnly cookie so the browser never has to
-         keep the PIN itself. Every later admin call authorises on this. */
-      set.headers['set-cookie'] = adminCookieHeader(
-        createAdminToken(),
-        Math.floor(ADMIN_TTL_MS / 1000),
-        secure
-      );
-
-      return { valid: true, message: '' };
-    },
-    { body: t.Object({ pin: t.String() }) }
-  )
-
-  /* Is there a live admin cookie? Deliberately separate from /pin/verify:
-     the page asks this on every load, and routing that through the PIN check
-     would spend a lockout attempt each time and lock the admin out of their
-     own console after ten refreshes. */
-  .get('/pin/session', ({ request }) => ({ valid: readAdminSession(request) }))
-
-  /* Ends the admin session server-side. The browser can't clear an HttpOnly
-     cookie itself, so "lock" has to ask for it. */
-  .post('/pin/logout', ({ request, set }) => {
-    set.headers['set-cookie'] = adminCookieHeader(
-      '',
-      0,
-      new URL(request.url).protocol === 'https:'
-    );
-    return { success: true };
-  })
-
   /* Ends the Discord session. Shared with /register and /medical on purpose:
      disconnecting means this browser is no longer signed in as that Discord
-     account anywhere. Like the admin cookie, only the server can clear it. */
+     account anywhere. Only the server can clear an HttpOnly cookie. */
   .post('/discord/logout', ({ request, set }) => {
     set.headers['set-cookie'] = sessionCookieHeader(
       '',
@@ -85,7 +29,7 @@ export const adminRoutes = new Elysia({ name: 'admin' })
   .post(
     '/mark-paid',
     async ({ body, request }) => {
-      requirePin(body, request);
+      const actor = await requirePermission(request, ROSTER_MANAGE);
       const { weekName, officerName, idempotencyKey } = body;
 
       if (idempotencyKey) {
@@ -103,6 +47,11 @@ export const adminRoutes = new Elysia({ name: 'admin' })
         const result = await markOfficerAsPaid(weekName, officerName);
         const message = `อัปเดตแถวที่ ${result.rowIndex} สำเร็จ`;
         if (idempotencyKey) setPaymentResult(idempotencyKey, true, message);
+
+        /* Money moved, so record who said so. The shared PIN this replaced
+           could never answer that question. */
+        console.log(`[mark-paid] ${actor} ${officerName} / ${weekName}`);
+
         return { success: true, message, idempotencyKey };
       } catch (err) {
         // Drop the key so a retry is allowed rather than pinned at "processing".
@@ -112,7 +61,6 @@ export const adminRoutes = new Elysia({ name: 'admin' })
     },
     {
       body: t.Object({
-        pin: t.String(),
         weekName: t.String({ minLength: 1 }),
         officerName: t.String({ minLength: 1 }),
         idempotencyKey: t.Optional(t.String()),

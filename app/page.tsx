@@ -1,7 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useCallback, useMemo, useState } from 'react';
 import { SiteFooter, SiteHeader } from '@/components/SiteHeader';
 import { NavTabs, type PageId } from '@/components/NavTabs';
 import { SearchBar } from '@/components/SearchBar';
@@ -12,26 +11,21 @@ import { FinesView } from '@/components/views/FinesView';
 import { CasesView } from '@/components/views/CasesView';
 import { ScheduleView } from '@/components/views/ScheduleView';
 import { ErrorState, Loading } from '@/components/ui/States';
-import { PinModal } from '@/components/ui/Modal';
+import { AdminGateModal } from '@/components/ui/Modal';
 import { useApi } from '@/lib/client/api';
 import { queries } from '@/lib/client/queries';
 import { filterByQuery } from '@/lib/format';
-import { clearPin, isAdminMode, openAdminSession, verifyStoredPin } from '@/lib/client/adminPin';
+import { useAdminGate } from '@/lib/client/adminAccess';
+import { useDiscordAuth } from '@/lib/client/useDiscordAuth';
 import './home.css';
 
 export default function HomePage() {
-  const router = useRouter();
   const [page, setPage] = useState<PageId>('roster');
   const [query, setQuery] = useState('');
 
-  const [adminMode, setAdminMode] = useState(false);
-  /* Both prompts ask for the same PIN; only what happens next differs —
-     'admin' unlocks editing in place, 'police' continues to /police. */
-  const [pinPrompt, setPinPrompt] = useState<null | 'admin' | 'police'>(null);
-  useEffect(() => {
-    setAdminMode(isAdminMode());
-    void verifyStoredPin().then(setAdminMode);
-  }, []);
+  const gate = useAdminGate();
+  const auth = useDiscordAuth('home', true);
+  const [gateOpen, setGateOpen] = useState(false);
 
   /* Each tab's data is a separate Google Sheets round trip, so a tab is
      fetched the first time it is opened and kept from then on — switching
@@ -64,29 +58,16 @@ export default function HomePage() {
   return (
     <div className="home-page flex min-h-screen flex-col">
       <SiteHeader
-        /* The ⚖ POLICE badge is the way into the staff hub. It stays a real
-           link so it can be opened in a new tab and prefetched, but a locked
-           visitor is held here for the PIN instead of bouncing off /police. */
+        /* A plain link: /police gates itself against the same allowlist, and
+           its own gate is the one place that can offer a Discord login. */
         badgeHref="/police"
-        badgeTitle="ศูนย์รวมระบบตำรวจ — ต้องใส่ PIN"
-        onBadgeClick={(e) => {
-          if (adminMode) return;
-          e.preventDefault();
-          setPinPrompt('police');
-        }}
+        badgeTitle="ศูนย์รวมระบบตำรวจ — เฉพาะผู้ดูแล"
         extraBadge={
           <button
             type="button"
-            onClick={() => {
-              if (adminMode) {
-                clearPin();
-                setAdminMode(false);
-              } else {
-                setPinPrompt('admin');
-              }
-            }}
+            onClick={() => setGateOpen(true)}
             className={`cursor-pointer rounded-md border px-2.5 py-1 text-[0.55rem] font-bold tracking-wide whitespace-nowrap transition ${
-              adminMode
+              gate.adminMode
                 ? 'border-[#f77f07] bg-[#f77f07] text-white'
                 : 'border-[#f77f07]/30 bg-[#f77f07]/10 text-[#f77f07] hover:bg-[#f77f07]/20'
             }`}
@@ -147,7 +128,7 @@ export default function HomePage() {
               title="ข้อปฏิบัติเจ้าหน้าที่"
               emptyTitle="ไม่พบข้อปฏิบัติที่ค้นหา"
               type="conduct"
-              adminMode={adminMode}
+              adminMode={gate.adminMode}
               onDataChanged={conduct.reload}
             />
           )}
@@ -164,7 +145,7 @@ export default function HomePage() {
               title="กฎหมายและระเบียบตำรวจ"
               emptyTitle="ไม่พบกฎที่ค้นหา"
               type="rules"
-              adminMode={adminMode}
+              adminMode={gate.adminMode}
               onDataChanged={rules.reload}
             />
           )}
@@ -176,7 +157,7 @@ export default function HomePage() {
               error={fines.error}
               query={query}
               onRetry={fines.reload}
-              adminMode={adminMode}
+              adminMode={gate.adminMode}
               onDataChanged={fines.reload}
             />
           )}
@@ -194,21 +175,20 @@ export default function HomePage() {
 
       <SiteFooter />
 
-      {pinPrompt && (
-        <PinModal
-          title={
-            pinPrompt === 'police'
-              ? 'กรุณาระบุรหัสผ่านเพื่อเข้าศูนย์รวมระบบตำรวจ'
-              : 'กรุณาระบุรหัสผ่านเพื่อเข้าโหมดผู้ดูแล'
-          }
-          onCancel={() => setPinPrompt(null)}
-          onSubmit={() => {
-            openAdminSession();
-            const mode = pinPrompt;
-            setPinPrompt(null);
-            setAdminMode(true);
-            if (mode === 'police') router.push('/police');
+      {gateOpen && (
+        <AdminGateModal
+          checking={gate.checking}
+          userId={gate.userId}
+          allowed={gate.allowed}
+          loginUrl={auth.loginUrl}
+          failed={auth.failed}
+          adminMode={gate.adminMode}
+          onToggleAdminMode={(on) => {
+            gate.setAdminMode(on);
+            setGateOpen(false);
           }}
+          onLogout={() => void gate.logout()}
+          onClose={() => setGateOpen(false)}
         />
       )}
     </div>
