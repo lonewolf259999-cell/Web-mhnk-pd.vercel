@@ -6,7 +6,7 @@ import { useDiscordAuth } from '@/lib/client/useDiscordAuth';
 import { BackHome } from '@/components/ui/BackHome';
 import { CopyInline } from '@/components/ui/CopyInline';
 import { DebugLog, PageToast, useDebugLog, useToastState } from './AdminShell';
-import { DiscordGate, DiscordSessionBar, type GateState } from './DiscordGate';
+import { DiscordGate, DiscordSessionBar, useAccessGate } from './DiscordGate';
 
 /* Column headers come from the Pending sheet, so they are Thai strings. */
 const COL = {
@@ -41,8 +41,11 @@ export function ProctorPanel() {
   const [toast, showToast] = useToastState();
   const [logText, log] = useDebugLog();
 
-  const [gate, setGate] = useState<GateState | null>(null);
-  const [checking, setChecking] = useState(true);
+  const { gate, checking, refresh: refreshAccess, clear: clearGate } = useAccessGate(
+    mutations.proctorAccess,
+    log
+  );
+
   const [rows, setRows] = useState<Row[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [loadError, setLoadError] = useState('');
@@ -51,27 +54,6 @@ export function ProctorPanel() {
 
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
-
-  /* Whether this browser is signed in, and whether that account is on the
-     allowlist in the sheet — neither of which the page can tell by looking,
-     since the Discord session is an HttpOnly cookie. Asking on load is also
-     what makes a refresh survive: the OAuth params in the URL are stripped by
-     then, the cookie is not. */
-  const refreshAccess = useCallback(async (): Promise<GateState> => {
-    try {
-      const result = await mutations.proctorAccess();
-      setGate(result);
-      return result;
-    } catch (err) {
-      // An unanswered question is not a yes.
-      const denied: GateState = { userId: null, allowed: false, problem: '' };
-      setGate(denied);
-      log(`Error: ${(err as Error).message}`);
-      return denied;
-    } finally {
-      setChecking(false);
-    }
-  }, [log]);
 
   const loadData = useCallback(async () => {
     setBusy(true);
@@ -102,10 +84,6 @@ export function ProctorPanel() {
     }
   }, [log, showToast, refreshAccess]);
 
-  useEffect(() => {
-    void refreshAccess();
-  }, [refreshAccess]);
-
   /* On the list: straight into the table. With the PIN field gone there is no
      second step left for the person to click. */
   const allowed = gate?.allowed ?? false;
@@ -119,7 +97,7 @@ export function ProctorPanel() {
     } catch {
       /* the cookie expires on its own; nothing useful to show */
     }
-    setGate({ userId: null, allowed: false, problem: '' });
+    clearGate();
     setLoaded(false);
     setRows([]);
     auth.disconnect();

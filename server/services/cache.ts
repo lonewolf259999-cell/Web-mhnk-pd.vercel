@@ -29,10 +29,6 @@ export function invalidate(key: string): void {
   store.delete(key);
 }
 
-export function clearAll(): void {
-  store.clear();
-}
-
 /** Fetch through the cache: returns the cached value or computes and stores it. */
 export async function cached<T>(key: string, compute: () => Promise<T>): Promise<T> {
   const hit = getCached<T>(key);

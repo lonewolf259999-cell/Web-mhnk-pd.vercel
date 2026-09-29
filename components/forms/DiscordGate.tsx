@@ -13,6 +13,7 @@
    looks as it did with the PIN step taken out. */
 
 import Link from 'next/link';
+import { useCallback, useEffect, useState } from 'react';
 import { CopyInline } from '@/components/ui/CopyInline';
 import { avatarUrlFor, type DiscordUser } from '@/lib/client/useDiscordAuth';
 import { DiscordIcon } from './DiscordIcon';
@@ -53,6 +54,54 @@ export interface GateState {
       `allowed`, so it reaches someone who can act on it. The console shows it;
       the gate deliberately does not. */
   problem: string;
+}
+
+const DENIED: GateState = { userId: null, allowed: false, problem: '' };
+
+/**
+ * Asks the server who this browser is signed in as and whether that account is
+ * on this console's allowlist. Neither is something the page can tell by
+ * looking: the Discord session is an HttpOnly cookie. Asking on load is also
+ * what makes a refresh survive — the OAuth params in the URL are stripped by
+ * then, the cookie is not.
+ *
+ * `refresh` is returned as well as run on mount, because access can be taken
+ * away while a console is open and the console has to be able to drop back to
+ * the gate rather than leave a dead table on screen.
+ *
+ * `fetchAccess` and `onError` must be stable references, or this re-asks on
+ * every render.
+ */
+export function useAccessGate(
+  fetchAccess: () => Promise<GateState>,
+  onError: (message: string) => void
+) {
+  const [gate, setGate] = useState<GateState | null>(null);
+  const [checking, setChecking] = useState(true);
+
+  const refresh = useCallback(async (): Promise<GateState> => {
+    try {
+      const result = await fetchAccess();
+      setGate(result);
+      return result;
+    } catch (err) {
+      // An unanswered question is not a yes.
+      setGate(DENIED);
+      onError(`Error: ${(err as Error).message}`);
+      return DENIED;
+    } finally {
+      setChecking(false);
+    }
+  }, [fetchAccess, onError]);
+
+  useEffect(() => {
+    void refresh();
+  }, [refresh]);
+
+  /** After a logout: the cookie is gone, so this browser is nobody again. */
+  const clear = useCallback(() => setGate(DENIED), []);
+
+  return { gate, checking, refresh, clear };
 }
 
 /**

@@ -7,6 +7,7 @@ import { SearchBar } from '@/components/SearchBar';
 import { AllTimeTop10, WeeklyTop10 } from '@/components/Top10Sidebar';
 import { RosterView } from '@/components/views/RosterView';
 import { RulesView } from '@/components/views/RulesView';
+import { RulesLinkView } from '@/components/views/RulesLinkView';
 import { FinesView } from '@/components/views/FinesView';
 import { CasesView } from '@/components/views/CasesView';
 import { ScheduleView } from '@/components/views/ScheduleView';
@@ -44,7 +45,6 @@ export default function HomePage() {
   const weeks = useApi(queries.weeks, 'weeks');
   const cases = useApi(queries.cases, 'cases_data', seen('cases'));
   const conduct = useApi(queries.conduct, 'conduct_data', seen('conduct'));
-  const rules = useApi(queries.rules, 'rules_data', seen('rules'));
   const fines = useApi(queries.fines, 'fines_data', seen('fines'));
   const schedule = useApi(queries.scheduleConfig, 'schedule_config', seen('schedule'));
 
@@ -133,22 +133,7 @@ export default function HomePage() {
             />
           )}
 
-          {page === 'rules' && (
-            <RulesView
-              items={rules.data}
-              loading={rules.loading}
-              error={rules.error}
-              query={query}
-              onRetry={rules.reload}
-              groupField="category"
-              icon="📖"
-              title="กฎหมายและระเบียบตำรวจ"
-              emptyTitle="ไม่พบกฎที่ค้นหา"
-              type="rules"
-              adminMode={gate.adminMode}
-              onDataChanged={rules.reload}
-            />
-          )}
+          {page === 'rules' && <RulesLinkView />}
 
           {page === 'fines' && (
             <FinesView
@@ -182,6 +167,7 @@ export default function HomePage() {
           allowed={gate.allowed}
           loginUrl={auth.loginUrl}
           failed={auth.failed}
+          problem={gate.problem}
           adminMode={gate.adminMode}
           onToggleAdminMode={(on) => {
             gate.setAdminMode(on);

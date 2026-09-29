@@ -29,14 +29,10 @@ export const queries = {
   conduct: () =>
     narrow<ConductItem[]>(unwrap(client.api['rules-data']({ type: 'conduct' }).get())),
 
-  rules: () => narrow<RuleItem[]>(unwrap(client.api['rules-data']({ type: 'rules' }).get())),
-
   fines: () => narrow<FineItem[]>(unwrap(client.api['rules-data']({ type: 'fines' }).get())),
 };
 
 export const mutations = {
-  refresh: () => unwrap(client.api.refresh.post()),
-
   /** Ends the Discord session — only the server can clear an HttpOnly cookie. */
   discordLogout: () => unwrap(client.api.discord.logout.post()),
 

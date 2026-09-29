@@ -1,7 +1,7 @@
 /* Sheets data layer — ported from server/services/sheetsService.js */
 
 import { config } from '@/server/config';
-import { cached, invalidate, clearAll } from './cache';
+import { cached, invalidate } from './cache';
 import { getSheets } from './googleAuth';
 import { parseCSV, mapOfficers, mapWeekData, mapWeekNames } from './csv';
 import type {
@@ -288,7 +288,3 @@ export async function markOfficerAsPaid(weekName: string, officerName: string) {
   return { rowIndex };
 }
 
-export async function refreshAll(): Promise<Officer[]> {
-  clearAll();
-  return getOfficers();
-}

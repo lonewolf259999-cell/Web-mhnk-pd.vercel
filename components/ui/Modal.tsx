@@ -47,6 +47,7 @@ export function AdminGateModal({
   allowed,
   loginUrl,
   failed = false,
+  problem = '',
   adminMode = false,
   onToggleAdminMode,
   onLogout,
@@ -59,6 +60,9 @@ export function AdminGateModal({
   loginUrl: string;
   /** The last Discord round trip came back as a failure. */
   failed?: boolean;
+  /** The allowlist could not be trusted. Only ever arrives with `allowed`, so
+      it reaches an admin who can go and fix the sheet — and nobody else. */
+  problem?: string;
   adminMode?: boolean;
   onToggleAdminMode?: (on: boolean) => void;
   onLogout: () => void;
@@ -126,6 +130,12 @@ export function AdminGateModal({
         <div className="space-y-3 text-sm">
           <p className="font-semibold text-success">✅ เข้าสู่ระบบในฐานะผู้ดูแล</p>
           {idBox}
+
+          {problem && (
+            <p className="rounded-md border border-gold/30 bg-gold/10 px-3 py-2 text-[0.78rem] leading-relaxed text-gold">
+              ⚠️ {problem}
+            </p>
+          )}
 
           {onToggleAdminMode && (
             <button

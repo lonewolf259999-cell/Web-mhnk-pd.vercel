@@ -38,6 +38,8 @@ Only the type crosses the boundary; no server code is bundled into the client.
 
 One wrinkle: `/rules-data/:type` serves four different shapes behind one route, so Eden infers the union of all of them. `queries.ts` narrows each literal back to its real type via a local `narrow<T>()` helper. That cast is intentional and belongs only there.
 
+The `rules` arm of that route is currently served but never asked for: the home page's กฎตำรวจ tab is `RulesLinkView`, a signpost to the city's Google Sites rulebook, so the sheet's own rules rows have no reader and no editor. The route, the `rules` sheet and `RulesType`'s `'rules'` member are all still in place — deliberately, because the data is still there — but nothing reaches them from the UI.
+
 ### Wire format
 
 Inherited from the v2 Express API this project replaced:
@@ -69,7 +71,7 @@ Large read-only sheets come through Google's GViz CSV export; writes and the rul
 
 | list | gates | routes | key cell | ids cell | key |
 |---|---|---|---|---|---|
-| `ROSTER_MANAGE` | `/rostermanage`, `/police`, the rules/fines/conduct CRUD, `/mark-paid`, `/refresh` | `routes/rosterAdmin.ts`, `rules.ts`, `admin.ts`, `roster.ts` | `NamePD!AA2` | `AB2` | `ROSTERMANAGE_IDDC` |
+| `ROSTER_MANAGE` | `/rostermanage`, `/police`, the conduct/fines CRUD, `/mark-paid` | `routes/rosterAdmin.ts`, `rules.ts`, `admin.ts` | `NamePD!AA2` | `AB2` | `ROSTERMANAGE_IDDC` |
 | `PROCTOR` | `/proctor` | `routes/pending.ts` | `Pending!L1` | `M1` | `PROCTOR_IDDC` |
 
 `ROSTER_MANAGE` is the site-wide admin list, not just its own console's: the same handful of people do all of it, so they are one list by choice rather than by accident. A group that should *not* overlap means adding a `PermissionSource`, not a second reader.
@@ -84,7 +86,7 @@ Consequences worth knowing before changing it:
 - Keep them clear of the data range. The proctor pair started at `I1/J1` and had to move to `L1/M1` the moment column I became a data column: a config cell inside the range arrives as a column header and ships the allowlist to the browser with every row.
 - The diagnostic in `problem` names the sheet and the cell, so it is returned **only alongside `allowed`** and logged server-side. A refused caller is told nothing about where the list lives.
 - `ROSTERMANAGE_IDDC` and `PROCTOR_IDDC` in the environment are standby lists, merged in on every path including the failure ones. They are what stops a mistyped cell from locking the last admin out of the page that edits that cell. They do not help if Discord OAuth itself breaks — and now that the PIN is gone, nothing else does either. That was the accepted cost of one attributable gate.
-- Every page asks its `access` endpoint on load because the session cookie is HttpOnly. Without that call a refresh looks like a logout. On the public pages the call is cheap: with no session cookie the server answers without reading the sheet.
+- Every page asks its `access` endpoint on load because the session cookie is HttpOnly. Without that call a refresh looks like a logout. On the public pages the call is cheap: with no session cookie the server answers without reading the sheet. The two consoles share `useAccessGate` in `components/forms/DiscordGate.tsx` for that; it takes the fetcher and an error sink, both of which must be stable references or it re-asks on every render.
 
 On the client, `lib/client/adminAccess.ts`'s `useAdminGate()` is what pages ask. It keeps two facts apart deliberately: `allowed` (may this account edit) and a 30-minute localStorage flag (has the person switched editing on). The Discord session lasts a week, so without the second flag an admin would find edit controls on every page for days — the one thing the PIN session got right, by expiring. Neither flag authorises anything; the server re-reads the list on every call.
 

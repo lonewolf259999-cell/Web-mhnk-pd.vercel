@@ -547,6 +547,7 @@ export function ProfileClient() {
           allowed={gate.allowed}
           loginUrl={auth.loginUrl}
           failed={auth.failed}
+          problem={gate.problem}
           onLogout={() => void gate.logout()}
           onClose={() => setGateOpen(false)}
         />
