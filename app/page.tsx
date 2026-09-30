@@ -13,6 +13,7 @@ import { CasesView } from '@/components/views/CasesView';
 import { ScheduleView } from '@/components/views/ScheduleView';
 import { ErrorState, Loading } from '@/components/ui/States';
 import { AdminGateModal } from '@/components/ui/Modal';
+import { DiscordStatus } from '@/components/ui/DiscordStatus';
 import { useApi } from '@/lib/client/api';
 import { queries } from '@/lib/client/queries';
 import { filterByQuery } from '@/lib/format';
@@ -63,17 +64,37 @@ export default function HomePage() {
         badgeHref="/police"
         badgeTitle="ศูนย์รวมระบบตำรวจ — เฉพาะผู้ดูแล"
         extraBadge={
-          <button
-            type="button"
-            onClick={() => setGateOpen(true)}
-            className={`cursor-pointer rounded-md border px-2.5 py-1 text-[0.55rem] font-bold tracking-wide whitespace-nowrap transition ${
-              gate.adminMode
-                ? 'border-[#f77f07] bg-[#f77f07] text-white'
-                : 'border-[#f77f07]/30 bg-[#f77f07]/10 text-[#f77f07] hover:bg-[#f77f07]/20'
-            }`}
-          >
-            ♛ Admin
-          </button>
+          <>
+            {/* Straight to editing for someone already on the list — the gate
+                panel is only for whoever still has to get on it. */}
+            <button
+              type="button"
+              onClick={() =>
+                gate.allowed ? gate.setAdminMode(!gate.adminMode) : setGateOpen(true)
+              }
+              title={
+                gate.allowed
+                  ? gate.adminMode
+                    ? 'ปิดโหมดแก้ไข'
+                    : 'เปิดโหมดแก้ไข'
+                  : 'โหมดผู้ดูแล'
+              }
+              className={`cursor-pointer rounded-md border px-2.5 py-1 text-[0.55rem] font-bold tracking-wide whitespace-nowrap transition ${
+                gate.adminMode
+                  ? 'border-[#f77f07] bg-[#f77f07] text-white'
+                  : 'border-[#f77f07]/30 bg-[#f77f07]/10 text-[#f77f07] hover:bg-[#f77f07]/20'
+              }`}
+            >
+              ♛ Admin
+            </button>
+
+            <DiscordStatus
+              userId={gate.userId}
+              user={auth.user}
+              loginUrl={auth.loginUrl}
+              onLogout={() => void gate.logout()}
+            />
+          </>
         }
       >
         <div className="header-nav-row">
@@ -168,11 +189,6 @@ export default function HomePage() {
           loginUrl={auth.loginUrl}
           failed={auth.failed}
           problem={gate.problem}
-          adminMode={gate.adminMode}
-          onToggleAdminMode={(on) => {
-            gate.setAdminMode(on);
-            setGateOpen(false);
-          }}
           onLogout={() => void gate.logout()}
           onClose={() => setGateOpen(false)}
         />

@@ -30,16 +30,18 @@ function Backdrop({ onClose, children }: { onClose: () => void; children: React.
 }
 
 /**
- * The ♛ Admin badge's one panel: who this browser is signed in as, whether
- * that account may edit, and the way in or out. It replaced the PIN prompt,
- * which could only ask a question and never answer one.
+ * Why an action is not available: sign in, or ask to be added to the list.
+ * It replaced the PIN prompt, which could only ask a question and never
+ * answer one.
+ *
+ * Someone already on the list rarely sees this — the ♛ Admin badge switches
+ * editing straight on for them, and the Discord status beside it already
+ * carries their name, their id and the way out. The `allowed` branch here is
+ * what the profile page's payment button falls back to, and the one place the
+ * `problem` diagnostic can reach an admin who can act on it.
  *
  * A refused account is shown its Discord id, because that is the one thing it
  * has to hand to whoever keeps the list — never where the list is kept.
- *
- * `onToggleAdminMode` is passed only by a page that has edit controls to
- * reveal. The profile page has none: there, being on the list is the whole
- * permission and the toggle would gate nothing.
  */
 export function AdminGateModal({
   checking,
@@ -48,8 +50,6 @@ export function AdminGateModal({
   loginUrl,
   failed = false,
   problem = '',
-  adminMode = false,
-  onToggleAdminMode,
   onLogout,
   onClose,
 }: {
@@ -63,8 +63,6 @@ export function AdminGateModal({
   /** The allowlist could not be trusted. Only ever arrives with `allowed`, so
       it reaches an admin who can go and fix the sheet — and nobody else. */
   problem?: string;
-  adminMode?: boolean;
-  onToggleAdminMode?: (on: boolean) => void;
   onLogout: () => void;
   onClose: () => void;
 }) {
@@ -135,18 +133,6 @@ export function AdminGateModal({
             <p className="rounded-md border border-gold/30 bg-gold/10 px-3 py-2 text-[0.78rem] leading-relaxed text-gold">
               ⚠️ {problem}
             </p>
-          )}
-
-          {onToggleAdminMode && (
-            <button
-              type="button"
-              onClick={() => onToggleAdminMode(!adminMode)}
-              className={`w-full cursor-pointer rounded-sm py-2.5 text-sm font-semibold transition hover:brightness-110 ${
-                adminMode ? 'bg-white/10 text-ink-dim' : 'bg-[#f77f07] text-night'
-              }`}
-            >
-              {adminMode ? 'ปิดโหมดแก้ไข' : 'เปิดโหมดแก้ไข'}
-            </button>
           )}
 
           {logoutButton}

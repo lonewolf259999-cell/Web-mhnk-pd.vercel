@@ -15,27 +15,8 @@
 import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
 import { CopyInline } from '@/components/ui/CopyInline';
-import { avatarUrlFor, type DiscordUser } from '@/lib/client/useDiscordAuth';
+import { displayFor, type DiscordUser } from '@/lib/client/useDiscordAuth';
 import { DiscordIcon } from './DiscordIcon';
-
-/* Shown when there is no profile to draw on — a browser that has not been
-   through the OAuth redirect, or one with storage blocked. An empty src would
-   make the browser re-request the page itself. */
-const DEFAULT_AVATAR = 'https://cdn.discordapp.com/embed/avatars/0.png';
-
-/**
- * The name and avatar to label a session with — but only when the cached
- * profile belongs to the account the server actually verified. The cache is
- * per-browser and survives a change of account, and labelling a session with
- * someone else's name is worse than showing no name at all.
- */
-function displayFor(userId: string | null, user: DiscordUser | null) {
-  const match = userId && user && user.userId === userId ? user : null;
-  return {
-    name: match?.name ?? '',
-    avatar: avatarUrlFor(match) ?? DEFAULT_AVATAR,
-  };
-}
 
 function CloseIcon() {
   return (

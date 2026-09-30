@@ -10,6 +10,7 @@ import { useDiscordAuth } from '@/lib/client/useDiscordAuth';
 import { findOfficerWeekData, isOfficerMatch } from '@/lib/format';
 import { SiteFooter } from '@/components/SiteHeader';
 import { AdminGateModal, ConfirmModal, CopyButton } from '@/components/ui/Modal';
+import { DiscordStatus } from '@/components/ui/DiscordStatus';
 import { useToast } from '@/components/ui/Toast';
 import { Loading } from '@/components/ui/States';
 import { WeekSelector } from './WeekSelector';
@@ -382,9 +383,13 @@ export function ProfileClient() {
           <span className="rounded-[6px] border border-accent/15 bg-accent/10 px-2.5 py-1 text-[0.55rem] font-bold tracking-[0.5px] text-accent">
             ⚖ POLICE
           </span>
+          {/* Lit when this account may confirm payments. There is nothing to
+              switch on here — the payment button is the only admin control and
+              it asks the gate itself — so a click opens the status panel. */}
           <button
             type="button"
             onClick={() => setGateOpen(true)}
+            title="โหมดผู้ดูแล"
             className={`cursor-pointer rounded-[6px] border px-2.5 py-1 text-[0.55rem] font-bold tracking-[0.5px] whitespace-nowrap transition ${
               gate.allowed
                 ? 'border-[#f77f07] bg-[#f77f07] text-white'
@@ -393,6 +398,13 @@ export function ProfileClient() {
           >
             ♛ Admin
           </button>
+
+          <DiscordStatus
+            userId={gate.userId}
+            user={auth.user}
+            loginUrl={auth.loginUrl}
+            onLogout={() => void gate.logout()}
+          />
         </div>
       </div>
     </header>

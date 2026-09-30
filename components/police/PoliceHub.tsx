@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { SiteFooter, SiteHeader } from '@/components/SiteHeader';
 import { CopyButton } from '@/components/ui/Modal';
+import { DiscordStatus } from '@/components/ui/DiscordStatus';
 import { DiscordIcon } from '@/components/forms/DiscordIcon';
 import { useAdminGate } from '@/lib/client/adminAccess';
 import { useDiscordAuth } from '@/lib/client/useDiscordAuth';
@@ -59,7 +60,16 @@ export function PoliceHub() {
 
   return (
     <div className="flex min-h-screen flex-col">
-      <SiteHeader />
+      <SiteHeader
+        extraBadge={
+          <DiscordStatus
+            userId={gate.userId}
+            user={auth.user}
+            loginUrl={auth.loginUrl}
+            onLogout={() => void gate.logout()}
+          />
+        }
+      />
 
       {gate.allowed ? (
         <Hub onLogout={() => void gate.logout()} />

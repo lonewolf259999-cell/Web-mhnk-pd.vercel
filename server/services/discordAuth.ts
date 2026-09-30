@@ -24,6 +24,7 @@ export function fallbackPage(state: string | null): string {
   if (state === 'roster') return '/rostermanage';
   if (state === 'home') return '/';
   if (state === 'police') return '/police';
+  if (state === 'regulation') return '/regulation';
 
   if (state?.startsWith('profile:')) {
     const name = state.slice('profile:'.length);

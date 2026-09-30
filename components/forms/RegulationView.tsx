@@ -3,8 +3,11 @@
 import { useState } from 'react';
 import { useApi } from '@/lib/client/api';
 import { queries } from '@/lib/client/queries';
+import { useAdminGate } from '@/lib/client/adminAccess';
+import { useDiscordAuth } from '@/lib/client/useDiscordAuth';
 import { RulesView } from '@/components/views/RulesView';
 import { SiteFooter, SiteHeader } from '@/components/SiteHeader';
+import { DiscordStatus } from '@/components/ui/DiscordStatus';
 import { SearchBar } from '@/components/SearchBar';
 import Link from 'next/link';
 
@@ -14,10 +17,21 @@ import Link from 'next/link';
 export function RegulationView() {
   const [query, setQuery] = useState('');
   const conduct = useApi(queries.conduct, 'conduct_data');
+  const gate = useAdminGate();
+  const auth = useDiscordAuth('regulation', true);
 
   return (
     <div className="flex min-h-screen flex-col">
-      <SiteHeader />
+      <SiteHeader
+        extraBadge={
+          <DiscordStatus
+            userId={gate.userId}
+            user={auth.user}
+            loginUrl={auth.loginUrl}
+            onLogout={() => void gate.logout()}
+          />
+        }
+      />
 
       <main className="mx-auto w-full max-w-[1300px] flex-1 px-4 py-6 lg:px-6">
         <div className="mb-5">
