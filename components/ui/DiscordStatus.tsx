@@ -10,7 +10,6 @@
    to whoever keeps the allowlist, and until this existed the only way to see
    it was to be refused by a console. */
 
-import Link from 'next/link';
 import { displayFor, type DiscordUser } from '@/lib/client/useDiscordAuth';
 import { DiscordIcon } from '@/components/forms/DiscordIcon';
 
@@ -29,13 +28,17 @@ export function DiscordStatus({
 }) {
   if (!userId) {
     return (
-      <Link
+      /* A plain anchor, not next/link: /auth/discord is a redirect off to
+         discord.com, and Link prefetches its target as an RSC payload — a
+         cross-origin fetch the browser blocks, which fails loudly in the
+         console on every page before falling back to a normal navigation. */
+      <a
         href={loginUrl}
         className="flex items-center gap-1.5 rounded-[6px] border border-[#5865f2]/40 bg-[#5865f2]/15 px-2.5 py-1 text-[0.55rem] font-bold tracking-[0.5px] whitespace-nowrap text-[#aab4ff] transition hover:bg-[#5865f2]/30 hover:text-white"
       >
         <DiscordIcon size={13} />
         เชื่อมต่อ Discord
-      </Link>
+      </a>
     );
   }
 

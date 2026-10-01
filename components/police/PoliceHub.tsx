@@ -156,13 +156,15 @@ function AccessGate({
               เชื่อมต่อ Discord เพื่อเข้าศูนย์รวมระบบตำรวจ
             </p>
 
-            <Link
+            {/* Plain anchor: /auth/discord redirects off to discord.com, which
+                next/link would try to prefetch cross-origin and fail on. */}
+            <a
               href={loginUrl}
               className="flex w-full items-center justify-center gap-2 rounded-sm bg-[#5865f2] py-2.5 text-sm font-semibold text-white transition hover:brightness-110"
             >
               <DiscordIcon size={18} />
               เชื่อมต่อ Discord
-            </Link>
+            </a>
 
             {failed && (
               <p role="alert" className="mt-3 text-sm font-medium text-danger">

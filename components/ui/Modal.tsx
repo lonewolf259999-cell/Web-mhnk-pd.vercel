@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import Link from 'next/link';
 import { DiscordIcon } from '@/components/forms/DiscordIcon';
 
 function Backdrop({ onClose, children }: { onClose: () => void; children: React.ReactNode }) {
@@ -103,13 +102,15 @@ export function AdminGateModal({
         <div className="space-y-3 text-sm">
           <p className="text-ink-dim">เชื่อมต่อ Discord เพื่อตรวจสอบสิทธิ์ผู้ดูแล</p>
 
-          <Link
+          {/* Plain anchor: /auth/discord redirects off to discord.com, which
+              next/link would try to prefetch cross-origin and fail on. */}
+          <a
             href={loginUrl}
             className="flex w-full items-center justify-center gap-2 rounded-sm bg-[#5865f2] py-2.5 text-sm font-semibold text-white transition hover:brightness-110"
           >
             <DiscordIcon size={18} />
             เชื่อมต่อ Discord
-          </Link>
+          </a>
 
           {failed && (
             <p role="alert" className="text-center text-sm font-medium text-danger">

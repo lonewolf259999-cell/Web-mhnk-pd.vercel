@@ -7,7 +7,6 @@
    the Discord connect panel that turns green once linked, the read-only
    Discord ID field with its live status pill, and the gold-tinted edit mode. */
 
-import Link from 'next/link';
 import type { DiscordAuthState } from '@/lib/client/useDiscordAuth';
 import { DiscordIcon } from './DiscordIcon';
 
@@ -134,12 +133,14 @@ export function DiscordConnectPanel({ auth }: { auth: DiscordAuthState }) {
       ) : (
         <>
           <p className="mb-4 text-[13px] text-ink-dim">กรุณาเชื่อมต่อ Discord ก่อนกรอกข้อมูล</p>
-          <Link
+          {/* Plain anchor: /auth/discord redirects off to discord.com, which
+              next/link would try to prefetch cross-origin and fail on. */}
+          <a
             href={auth.loginUrl}
             className="inline-flex cursor-pointer items-center justify-center gap-2.5 rounded-md bg-gradient-to-br from-[#5865F2] to-[#4752C4] px-8 py-3.5 text-[15px] font-bold text-white shadow-[0_4px_15px_rgba(88,101,242,0.3)] transition hover:-translate-y-0.5 hover:from-[#4752C4] hover:to-[#3C45A5] hover:shadow-[0_8px_25px_rgba(88,101,242,0.5)]"
           >
             <DiscordIcon size={24} /> เชื่อมต่อ Discord
-          </Link>
+          </a>
         </>
       )}
     </div>

@@ -12,7 +12,6 @@
    Styling reuses each page's existing .login-box / .dc-* classes, so the gate
    looks as it did with the PIN step taken out. */
 
-import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
 import { CopyInline } from '@/components/ui/CopyInline';
 import { displayFor, type DiscordUser } from '@/lib/client/useDiscordAuth';
@@ -147,14 +146,16 @@ export function DiscordGate({
 
         {!checking && !signedIn && (
           <>
-            <Link
+            {/* Plain anchor: /auth/discord redirects off to discord.com, which
+                next/link would try to prefetch cross-origin and fail on. */}
+            <a
               href={loginUrl}
               className="btn-discord"
               style={{ width: '100%', justifyContent: 'center' }}
             >
               <DiscordIcon size={20} />
               เชื่อมต่อ Discord
-            </Link>
+            </a>
             {failed && (
               <div style={{ marginTop: 10, color: '#ef4444', fontSize: 13 }}>
                 ❌ เชื่อมต่อ Discord ไม่สำเร็จ กรุณาลองอีกครั้ง
