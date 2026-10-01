@@ -20,6 +20,7 @@ import {
   checkPermission,
   requirePermission,
 } from '@/server/services/permissions';
+import { logEvent } from '@/server/services/opsLog';
 
 const rowParam = t.Object({ row: t.Numeric() });
 
@@ -59,7 +60,9 @@ export const rosterAdminRoutes = new Elysia({ name: 'roster-admin' })
 
       /* Every write is now attributable to one account, which is the point of
          the allowlist — so record who made it. */
-      console.log(`[roster] ${actor} status row=${params.row} → "${body.status}"`);
+      await logEvent('INFO', 'roster', `เปลี่ยนสถานะ แถว ${params.row} → "${body.status}"`, {
+        actor,
+      });
 
       const display = body.status || '✅ ปกติ';
       return { success: true, message: `อัปเดตสถานะเป็น "${display}" แล้ว` };
@@ -74,8 +77,11 @@ export const rosterAdminRoutes = new Elysia({ name: 'roster-admin' })
       const reason = assertReason(body.reason);
 
       const result = await moveToOutDC(params.row, reason);
-      console.log(
-        `[roster] ${actor} move-out row=${params.row} ${result.code} ${result.name} (${reason})`
+      await logEvent(
+        'INFO',
+        'roster',
+        `ย้ายออกจากระบบ แถว ${params.row} — ${result.code} ${result.name} (${reason})`,
+        { actor }
       );
 
       const warnings: string[] = [];

@@ -50,6 +50,12 @@ const GROUPS: { label: string; entries: Entry[] }[] = [
         title: 'Proctor',
         description: 'ตรวจสอบและอนุมัติใบสมัครของผู้สมัคร',
       },
+      {
+        href: '/police/logs',
+        icon: '📜',
+        title: 'Log & Debug',
+        description: 'ดู log และ error ของเว็บและบอท ย้อนหลังได้',
+      },
     ],
   },
 ];

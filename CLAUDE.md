@@ -61,6 +61,45 @@ Large read-only sheets come through Google's GViz CSV export; writes and the rul
 - `server/services/cache.ts`, `paymentStore.ts`, and `server/rateLimit.ts` are **instance-local**. Multiple Vercel instances do not share them — rate limits and idempotency keys throttle/dedupe per-instance, not globally.
 - Long-running work at module scope runs on every cold start; avoid adding any.
 
+### The operational log is a spreadsheet, not memory
+
+`services/opsLog.ts` appends to the `Log-Debug-web` tab of the bot's Settings
+spreadsheet — the same file that holds the bot's `config`. `/police/logs` reads
+it back, alongside the bot's own `Log-Debug-Bot` tab and the bot's live 24h
+buffer over HTTP.
+
+A buffer here would be pointless for the same reason `cache.ts` and
+`rateLimit.ts` are instance-local: nothing in this runtime survives a request,
+so "what happened an hour ago" would be answered with whatever one instance
+happens to remember. Only lines worth keeping go to the sheet; the bot's verbose
+debug stays in the bot's memory, where it costs nothing.
+
+The constraint is write volume, not size. The bot and this app share one Google
+service account and therefore one write quota — the quota the bot needs to
+record case counts. Admin actions and errors are tens per day, which is nothing;
+logging every request would not be, so `logEvent` also caps itself at 20 sheet
+writes per minute per instance and says so in the next line that gets through.
+
+Three things that look like details and are not:
+
+- **`RAW`, never `USER_ENTERED`.** The latter turns `2026-10-02 03:47:11` into a
+  Google date value, and reading it back returns the cell's *display* format
+  ("3:47:11") rather than what was written. Retention walks those timestamps, so
+  that mismatch silently stops cleanup forever. `parseLogTime` tolerates
+  unpadded parts anyway, for rows written before this was understood.
+- **Redaction happens on the way in.** Error text drags Google keys and Discord
+  tokens along with it, and these rows land in a spreadsheet and on a page other
+  admins open. Filtering at display time would mean the secret was already
+  stored. The bot carries its own copy of `redact` — separate deploys, no shared
+  module, so change both.
+- **`logEvent` is awaited and never throws.** Fire-and-forget loses writes when
+  an instance is frozen right after its response, and a failed log line must not
+  turn a working request into an error.
+
+Retention is trimmed when an admin opens the page, not on a schedule: there is
+no scheduler here, and a cron hitting a route is more moving parts than a tab of
+a few thousand rows justifies. The bot trims its own tab on its own timer.
+
 ### Rate limiting
 
 `/register` and `/medical` are both rate-limited (10/min per client) via `rateLimit()` in `server/rateLimit.ts`, keyed by `clientKey` (best-effort from `X-Forwarded-For`) — apply the same call to any new public submission endpoint.

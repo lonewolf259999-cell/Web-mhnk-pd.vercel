@@ -10,6 +10,7 @@ import {
 import { ApiError } from '@/server/errors';
 import { ROSTER_MANAGE, requirePermission } from '@/server/services/permissions';
 import { sessionCookieHeader } from '@/server/services/session';
+import { logEvent } from '@/server/services/opsLog';
 
 export const adminRoutes = new Elysia({ name: 'admin' })
   .get('/schedule-config', () => scheduleConfig)
@@ -49,8 +50,12 @@ export const adminRoutes = new Elysia({ name: 'admin' })
         if (idempotencyKey) setPaymentResult(idempotencyKey, true, message);
 
         /* Money moved, so record who said so. The shared PIN this replaced
-           could never answer that question. */
-        console.log(`[mark-paid] ${actor} ${officerName} / ${weekName}`);
+           could never answer that question — and now the record outlives the
+           platform's own log retention, in the sheet /police/logs reads. */
+        await logEvent('INFO', 'mark-paid', `${officerName} / ${weekName}`, {
+          actor,
+          detail: { row: result.rowIndex },
+        });
 
         return { success: true, message, idempotencyKey };
       } catch (err) {

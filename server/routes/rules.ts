@@ -3,6 +3,7 @@ import { addRule, deleteRule, getCases, getRulesData, updateRule } from '@/serve
 import { ApiError } from '@/server/errors';
 import { ROSTER_MANAGE, requirePermission } from '@/server/services/permissions';
 import type { RulesType } from '@/lib/types';
+import { logEvent } from '@/server/services/opsLog';
 
 const WRITE_TYPES = ['conduct', 'rules', 'fines'] as const;
 
@@ -56,7 +57,7 @@ export const rulesRoutes = new Elysia({ name: 'rules' })
       if (!body.id) throw new ApiError('Missing required field: id', 400);
 
       const result = await addRule(type, toRow(body, body.id));
-      console.log(`[rules] ${actor} add ${type} ${body.id}`);
+      await logEvent('INFO', 'rules', `เพิ่ม ${type} รหัส ${body.id}`, { actor });
       return { success: true as const, message: 'เพิ่มข้อมูลสำเร็จ', data: result };
     },
     { params: t.Object({ type: t.String() }), body: rulePayload }
@@ -69,7 +70,7 @@ export const rulesRoutes = new Elysia({ name: 'rules' })
       const type = assertWritable(params.type);
 
       const result = await updateRule(type, params.id, toRow(body, params.id));
-      console.log(`[rules] ${actor} edit ${type} ${params.id}`);
+      await logEvent('INFO', 'rules', `แก้ไข ${type} รหัส ${params.id}`, { actor });
       return { success: true as const, message: 'แก้ไขข้อมูลสำเร็จ', data: result };
     },
     { params: t.Object({ type: t.String(), id: t.String() }), body: rulePayload }
@@ -82,7 +83,7 @@ export const rulesRoutes = new Elysia({ name: 'rules' })
       const type = assertWritable(params.type);
 
       const result = await deleteRule(type, params.id);
-      console.log(`[rules] ${actor} delete ${type} ${params.id}`);
+      await logEvent('INFO', 'rules', `ลบ ${type} รหัส ${params.id}`, { actor });
       return { success: true as const, message: 'ลบข้อมูลสำเร็จ', data: result };
     },
     { params: t.Object({ type: t.String(), id: t.String() }) }

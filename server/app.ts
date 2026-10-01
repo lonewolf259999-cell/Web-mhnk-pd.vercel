@@ -1,11 +1,13 @@
 import { Elysia } from 'elysia';
 import { ApiError } from './errors';
+import { logEvent } from './services/opsLog';
 import { rosterRoutes } from './routes/roster';
 import { rulesRoutes } from './routes/rules';
 import { adminRoutes } from './routes/admin';
 import { registrationRoutes } from './routes/registration';
 import { rosterAdminRoutes } from './routes/rosterAdmin';
 import { pendingRoutes } from './routes/pending';
+import { logRoutes } from './routes/logs';
 
 /**
  * The API, mounted into Next.js at app/api/[[...slugs]]/route.ts.
@@ -15,7 +17,7 @@ import { pendingRoutes } from './routes/pending';
  * standard Request/Response pair.
  */
 export const api = new Elysia({ prefix: '/api' })
-  .onError(({ error, code, set }) => {
+  .onError(async ({ error, code, set }) => {
     if (error instanceof ApiError) {
       set.status = error.status;
       return { error: error.message };
@@ -32,7 +34,11 @@ export const api = new Elysia({ prefix: '/api' })
     }
 
     const message = error instanceof Error ? error.message : 'Unexpected error';
-    console.error('[api]', message);
+    /* Awaited rather than fired and forgotten: a serverless instance can be
+       frozen the moment the response goes out, which drops work still in
+       flight. This path has already failed, so the extra wait costs nothing
+       anyone was waiting on, and opsLog caps how often it reaches the sheet. */
+    await logEvent('ERROR', 'api', message);
     set.status = 500;
     return { error: message };
   })
@@ -41,7 +47,8 @@ export const api = new Elysia({ prefix: '/api' })
   .use(adminRoutes)
   .use(registrationRoutes)
   .use(rosterAdminRoutes)
-  .use(pendingRoutes);
+  .use(pendingRoutes)
+  .use(logRoutes);
 
 /** Consumed by Eden Treaty on the client for end-to-end types. */
 export type Api = typeof api;

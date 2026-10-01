@@ -14,6 +14,7 @@ import {
 import { sendProctorRecord } from '@/server/services/discord';
 import { ApiError } from '@/server/errors';
 import { PROCTOR, checkPermission, requirePermission } from '@/server/services/permissions';
+import { logEvent } from '@/server/services/opsLog';
 
 const rowParam = t.Object({ row: t.Numeric() });
 
@@ -39,7 +40,7 @@ export const pendingRoutes = new Elysia({ name: 'pending' })
 
       const applicant = (await getPendingRegistrations()).find((r) => r._row === params.row);
       await approvePending(params.row);
-      console.log(`[pending] ${proctorId} approved row=${params.row}`);
+      await logEvent('INFO', 'pending', `อนุมัติใบสมัคร แถว ${params.row}`, { actor: proctorId });
 
       // Notifying the proctor is best-effort; approval already succeeded.
       if (applicant) {
@@ -49,7 +50,11 @@ export const pendingRoutes = new Elysia({ name: 'pending' })
             icName: String(applicant['ชื่อ IC'] ?? ''),
             discordId: String(applicant['Discord ID'] ?? ''),
           }
-        ).catch((err) => console.error('[pending] proctor webhook failed:', err.message));
+        ).catch((err) =>
+          logEvent('WARN', 'pending', `แจ้ง webhook ผู้คุมสอบไม่สำเร็จ: ${err.message}`, {
+            actor: proctorId,
+          })
+        );
       }
 
       return { success: true, message: 'อนุมัติเรียบร้อย' };
@@ -64,7 +69,7 @@ export const pendingRoutes = new Elysia({ name: 'pending' })
       if (params.row < 1) throw new ApiError('ระบุหมายเลขแถวไม่ถูกต้อง', 400);
 
       await rejectPending(params.row);
-      console.log(`[pending] ${proctorId} rejected row=${params.row}`);
+      await logEvent('INFO', 'pending', `ปฏิเสธใบสมัคร แถว ${params.row}`, { actor: proctorId });
 
       return { success: true, message: 'ปฏิเสธเรียบร้อย' };
     },

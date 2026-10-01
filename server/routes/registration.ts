@@ -20,6 +20,7 @@ import {
 import { ApiError } from '@/server/errors';
 import { clientKey, rateLimit } from '@/server/rateLimit';
 import { readSessionUserId } from '@/server/services/session';
+import { logEvent } from '@/server/services/opsLog';
 
 /* v2 rate-limited /api/register (10/min) but not /api/medical — applied
    consistently here to both submission endpoints. */
@@ -200,7 +201,7 @@ export const registrationRoutes = new Elysia({ name: 'registration' })
           messageId,
         });
       } catch (err) {
-        console.error('[register] pending sheet write failed:', (err as Error).message);
+        await logEvent('ERROR', 'register', `เขียนใบสมัครลงชีตไม่สำเร็จ: ${(err as Error).message}`);
       }
 
       return {
@@ -248,7 +249,7 @@ export const registrationRoutes = new Elysia({ name: 'registration' })
           steamUrl: body.steamUrl.trim(),
         });
       } catch (err) {
-        console.error('[register] pending sheet update failed:', (err as Error).message);
+        await logEvent('ERROR', 'register', `อัปเดตใบสมัครในชีตไม่สำเร็จ: ${(err as Error).message}`);
       }
 
       return { success: true, message: 'แก้ไขข้อมูลสำเร็จ! Embed ใน Discord อัปเดตแล้ว', editCount };
@@ -326,7 +327,7 @@ export const registrationRoutes = new Elysia({ name: 'registration' })
           messageId,
         });
       } catch (err) {
-        console.error('[medical] sheet write failed:', (err as Error).message);
+        await logEvent('ERROR', 'medical', `เขียนใบสมัครแพทย์ลงชีตไม่สำเร็จ: ${(err as Error).message}`);
       }
 
       return {
@@ -378,7 +379,7 @@ export const registrationRoutes = new Elysia({ name: 'registration' })
           joinReason: body.joinReason.trim(),
         });
       } catch (err) {
-        console.error('[medical] sheet update failed:', (err as Error).message);
+        await logEvent('ERROR', 'medical', `อัปเดตใบสมัครแพทย์ในชีตไม่สำเร็จ: ${(err as Error).message}`);
       }
 
       return { success: true, message: 'แก้ไขข้อมูลสำเร็จ! Embed ใน Discord อัปเดตแล้ว', editCount };

@@ -60,6 +60,31 @@ export const config = {
 
   APP_URL: process.env.APP_URL || 'http://localhost:3000',
 
+  /* ---- operational log (see services/opsLog.ts) ----
+
+     The bot's Settings spreadsheet, the same file that holds its `config` tab.
+     Logs belong beside that config rather than in a data file: they grow
+     without bound, and a tab growing inside NamePD or the weekly sheets slows
+     down the file people actually work in and eats its 10M-cell ceiling.
+     Defaulted rather than required so a missing variable cannot take the whole
+     site down over a page only admins open. */
+  LOG_SHEET_ID: process.env.LOG_SHEET_ID || '1YV_BIFiilxUM9XrW1cSYZTOgne1JnKoCXtRw7PUCCGs',
+
+  /* One tab per writer: this app appends to the first, the bot to the second.
+     Separate tabs mean the two never contend for the same append range, and
+     either can be read or cleared without touching the other. */
+  LOG_SHEET_NAME: 'Log-Debug-web',
+  BOT_LOG_SHEET_NAME: 'Log-Debug-Bot',
+
+  /* Where to ask the bot for its last 24 hours. Empty leaves that one tab on
+     /police/logs reporting it is unconfigured — the sheet-backed tabs still
+     work, so the page is useful without the bot being reachable at all. */
+  BOT_URL: process.env.BOT_URL || '',
+  BOT_LOG_TOKEN: process.env.BOT_LOG_TOKEN || '',
+
+  /** Rows older than this leave the web log tab. 0 keeps everything. */
+  LOG_RETENTION_DAYS: Number(process.env.LOG_RETENTION_DAYS || '30'),
+
   CACHE_TTL: 15_000,
   REQUEST_TIMEOUT: 10_000,
 } as const;

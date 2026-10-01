@@ -13,6 +13,15 @@ type RulesUnion = ConductItem[] | RuleItem[] | CaseItem[];
 
 const narrow = <T extends RulesUnion>(p: Promise<RulesUnion>) => p as Promise<T>;
 
+/** Filters the log endpoints accept; every field optional. */
+export interface LogQueryInput {
+  /** Comma-separated levels, e.g. 'ERROR,WARN'. */
+  level?: string;
+  context?: string;
+  q?: string;
+  limit?: number;
+}
+
 export const queries = {
   officers: () => unwrap(client.api.officers.get()),
 
@@ -100,6 +109,19 @@ export const mutations = {
 
   moveOut: (row: number, reason: string) =>
     unwrap(client.api.roster['move-out']({ row }).post({ reason })),
+
+  /* ---- log viewer (/police/logs) ----
+     Reads, but they live here with the other admin calls because they carry the
+     same session cookie and are refused without it. */
+
+  webLogs: (input: LogQueryInput = {}) => unwrap(client.api.logs.web.get({ query: input })),
+
+  /** The bot's important lines, kept in the sheet for 30 days. */
+  botLogs: (input: LogQueryInput = {}) => unwrap(client.api.logs.bot.get({ query: input })),
+
+  /** The bot's full trail for the last 24h, straight from its memory. */
+  botLiveLogs: (input: LogQueryInput = {}) =>
+    unwrap(client.api.logs.bot.live.get({ query: input })),
 
   /* ---- conduct/rules/fines admin CRUD ---- */
 
