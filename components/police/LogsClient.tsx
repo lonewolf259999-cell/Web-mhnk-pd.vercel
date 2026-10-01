@@ -78,6 +78,43 @@ function describeUptime(seconds: number): string {
   return h > 0 ? `${h} ชม. ${m} นาที` : `${m} นาที`;
 }
 
+/**
+ * Forces every field to a string before it reaches the DOM.
+ *
+ * React throws "Objects are not valid as a React child" on anything that is
+ * not a string or number, and in a client component that throw takes the whole
+ * page down. The rows come from a spreadsheet people edit by hand and from a
+ * bot on another host, so neither source is worth trusting to the letter.
+ */
+function toViewRow(row: Partial<ViewRow>): ViewRow {
+  const text = (v: unknown): string => {
+    if (v === null || v === undefined) return '';
+    if (typeof v === 'string') return v;
+    /* A Date here means something revived a timestamp string on the way in.
+       `parseDate: false` in eden.ts stops that at the source; this keeps the
+       page readable rather than merely unbroken if it ever happens again.
+       Local getters, because such a Date was parsed as local time — reading it
+       back the same way returns the digits the sheet actually holds. */
+    if (v instanceof Date && !Number.isNaN(v.getTime())) {
+      const p2 = (n: number) => String(n).padStart(2, '0');
+      return (
+        `${v.getFullYear()}-${p2(v.getMonth() + 1)}-${p2(v.getDate())} ` +
+        `${p2(v.getHours())}:${p2(v.getMinutes())}:${p2(v.getSeconds())}`
+      );
+    }
+    return String(v);
+  };
+
+  return {
+    at: text(row.at),
+    level: text(row.level),
+    context: text(row.context),
+    actor: text(row.actor),
+    message: text(row.message),
+    detail: text(row.detail),
+  };
+}
+
 /* The bot sends its own meta object; `actor` is lifted out of it so both
    sources line up in one table and the rest is shown as detail. */
 function splitMeta(meta: unknown): { actor: string; detail: string } {
@@ -130,20 +167,21 @@ export function LogsClient() {
     try {
       if (tab === 'live') {
         const res = await mutations.botLiveLogs(query);
+        const entries = Array.isArray(res.entries) ? res.entries : [];
         setRows(
-          res.entries.map((e) => {
+          entries.map((e) => {
             const { actor, detail } = splitMeta(e.meta);
-            return {
+            return toViewRow({
               at: formatAt(e.at),
               level: e.level,
               context: e.context,
               actor,
               message: e.message,
               detail,
-            };
+            });
           })
         );
-        setTotal(res.buffer.lines);
+        setTotal(res.buffer?.lines ?? entries.length);
 
         const span =
           res.buffer.oldest && res.buffer.newest
@@ -161,9 +199,11 @@ export function LogsClient() {
         );
       } else {
         const res = tab === 'web' ? await mutations.webLogs(query) : await mutations.botLogs(query);
-        setRows(res.rows);
-        setTotal(res.total);
-        setStatus(`เก็บไว้ทั้งหมด ${res.total.toLocaleString()} บรรทัด`);
+        const list = Array.isArray(res.rows) ? res.rows.map(toViewRow) : [];
+        const count = typeof res.total === 'number' ? res.total : list.length;
+        setRows(list);
+        setTotal(count);
+        setStatus(`เก็บไว้ทั้งหมด ${count.toLocaleString()} บรรทัด`);
       }
     } catch (err) {
       setRows([]);
@@ -175,7 +215,12 @@ export function LogsClient() {
     }
   }, [tab, query]);
 
-  loadRef.current = () => void load();
+  /* Written in an effect, not during render: React treats a ref touched while
+     rendering as undefined behaviour under concurrent rendering, and this one
+     exists only so the interval below always calls the newest version. */
+  useEffect(() => {
+    loadRef.current = () => void load();
+  }, [load]);
 
   useEffect(() => {
     if (!gate.allowed) return;
