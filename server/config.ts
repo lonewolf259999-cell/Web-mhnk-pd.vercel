@@ -82,8 +82,13 @@ export const config = {
   BOT_URL: process.env.BOT_URL || '',
   BOT_LOG_TOKEN: process.env.BOT_LOG_TOKEN || '',
 
-  /** Rows older than this leave the web log tab. 0 keeps everything. */
-  LOG_RETENTION_DAYS: Number(process.env.LOG_RETENTION_DAYS || '30'),
+  /* How many rows each log tab keeps. Oldest rows go first; 0 keeps everything.
+
+     A row count, not a day count: the two tabs are read whole on every page
+     load, and a flat ceiling is both easier to reason about and impossible to
+     break by reformatting a cell. The bot holds the same ceiling in its own
+     config so the two stay in step. */
+  LOG_MAX_ROWS: 100,
 
   CACHE_TTL: 15_000,
   REQUEST_TIMEOUT: 10_000,

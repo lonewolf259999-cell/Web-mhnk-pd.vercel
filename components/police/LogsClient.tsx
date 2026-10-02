@@ -28,8 +28,8 @@ import { mutations } from '@/lib/client/queries';
 type Tab = 'web' | 'bot' | 'live';
 
 const TABS: { id: Tab; label: string; hint: string }[] = [
-  { id: 'web', label: '🌐 เว็บ', hint: 'ย้อนหลัง 30 วัน' },
-  { id: 'bot', label: '🤖 บอท', hint: 'ย้อนหลัง 30 วัน' },
+  { id: 'web', label: '🌐 เว็บ', hint: '100 แถวล่าสุด' },
+  { id: 'bot', label: '🤖 บอท', hint: '100 แถวล่าสุด' },
   { id: 'live', label: '⚡ บอท (สด)', hint: 'ย้อนหลัง 24 ชม.' },
 ];
 

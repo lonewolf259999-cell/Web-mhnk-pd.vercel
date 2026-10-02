@@ -6,10 +6,15 @@
  *   Log-Debug-Bot   the Discord bot appends there; we only read it
  *
  * Both tabs live in the bot's Settings spreadsheet, beside its `config` tab —
- * not in a data file. Logs grow without bound, and a tab that grows inside
- * NamePD or the weekly sheets slows down the file people actually work in and
- * eats the same 10M-cell ceiling. One tab per writer means the two never
- * contend for the same append range and each can be read or cleared alone.
+ * not in a data file. A tab that grows inside NamePD or the weekly sheets slows
+ * down the file people actually work in and eats the same 10M-cell ceiling. One
+ * tab per writer means the two never contend for the same append range and each
+ * can be read or cleared alone.
+ *
+ * Neither tab grows without bound: each keeps its newest `LOG_MAX_ROWS` rows.
+ * The bot trims both on a timer (it is the only side with one), and this app
+ * also trims its own tab when the page is opened, so a sleeping bot cannot let
+ * it drift.
  *
  * Why the sheet at all, for a serverless app: this runtime has no memory that
  * survives a request. `cache.ts` and `rateLimit.ts` are already instance-local
@@ -89,27 +94,9 @@ export function formatLogTime(at: number): string {
   );
 }
 
-/**
- * Reads a stored timestamp back. null when it cannot be trusted.
- *
- * Accepts unpadded parts too: a cell that was once written with
- * USER_ENTERED became a Google date value, and reading that back returns
- * whatever display format the cell carries ("3:47:11"). Cleanup walks these
- * timestamps, so a parser that rejects those would stop at the first such row
- * and then never delete anything again.
- */
-export function parseLogTime(text: string | undefined): number | null {
-  const m = (text ?? '')
-    .trim()
-    .match(/^(\d{4})-(\d{1,2})-(\d{1,2})[ T](\d{1,2}):(\d{1,2}):(\d{1,2})$/);
-  if (!m) return null;
-
-  const p2 = (s: string) => s.padStart(2, '0');
-  const ms = Date.parse(
-    `${m[1]}-${p2(m[2])}-${p2(m[3])}T${p2(m[4])}:${p2(m[5])}:${p2(m[6])}+07:00`
-  );
-  return Number.isNaN(ms) ? null : ms;
-}
+/* Timestamps are only ever written and displayed, never parsed back: trimming
+   counts rows instead of reading dates, so nothing here depends on how Google
+   chooses to display a cell. */
 
 /* ==================== redaction ==================== */
 
@@ -342,9 +329,9 @@ export interface LogResult {
 /**
  * This app's own log, tidied on the way out.
  *
- * One read serves both the answer and the retention check — the page is the
- * only thing that ever opens this tab, so it is also the only chance to trim
- * it, and doing both from one read keeps a page load to a single fetch.
+ * One read serves both the answer and the trim, which keeps a page load to a
+ * single fetch. The bot trims this tab on its own timer as well; doing it here
+ * too costs nothing on a read we already made and covers the bot being down.
  */
 export async function readWebLog(q: LogQuery): Promise<LogResult> {
   const values = await readTab(config.LOG_SHEET_NAME);
@@ -356,7 +343,7 @@ export async function readWebLog(q: LogQuery): Promise<LogResult> {
   return { rows: selectLogRows(kept, q), total: kept.length };
 }
 
-/** The bot's log, as it stands in the sheet (30 days, important lines only). */
+/** The bot's log, as it stands in the sheet (newest rows, important lines only). */
 export async function readBotSheetLog(q: LogQuery): Promise<LogResult> {
   const rows = toLogRows(await readTab(config.BOT_LOG_SHEET_NAME));
   return { rows: selectLogRows(rows, q), total: rows.length };
@@ -412,42 +399,34 @@ export async function fetchBotLiveLog(q: LogQuery): Promise<BotLiveResult> {
 /* ==================== cleanup ==================== */
 
 /**
- * How many data rows at the top are older than the cutoff.
+ * How many rows at the top are over the ceiling.
  *
- * Rows are only ever appended, so the oldest sit at the top and the walk can
- * stop at the first row that is still current. A timestamp that cannot be read
- * also stops it: leaving a row alone is always safer than deleting one that
- * might still be wanted.
+ * Rows are only ever appended, so the oldest sit at the top and dropping that
+ * many leaves exactly the newest `maxRows`. Row 1 is the header and is not
+ * counted as data. A ceiling of 0 or less means "keep everything", never
+ * "delete everything".
  */
-export function countExpiredRows(values: string[][], cutoff: number): number {
-  let n = 0;
-  for (let i = 1; i < values.length; i++) {
-    const at = parseLogTime(values[i]?.[0]);
-    if (at === null || at >= cutoff) break;
-    n = i;
-  }
-  return n;
+export function countRowsToDrop(values: string[][], maxRows: number): number {
+  if (maxRows <= 0) return 0;
+  const data = Math.max(values.length - 1, 0);
+  return data > maxRows ? data - maxRows : 0;
 }
 
 /**
- * Drops rows past the retention window from this app's tab.
+ * Trims this app's tab down to the newest `LOG_MAX_ROWS` rows.
  *
  * Runs when an admin opens the page rather than on a schedule: this runtime has
- * no scheduler, and the alternative — a cron hitting a route — is more moving
- * parts than a tab of a few thousand rows needs. The bot keeps its own tab
- * trimmed on its own timer.
+ * no scheduler. The bot does have one and trims both tabs there, so this is the
+ * backstop for the bot being asleep, not the only thing keeping the tab small.
  *
  * Never throws; tidying is not worth failing a page load over.
  */
 export async function cleanupWebLog(known?: string[][]): Promise<number> {
-  const days = config.LOG_RETENTION_DAYS;
-  if (!Number.isFinite(days) || days <= 0) return 0;
-
   try {
     // The caller usually just read the tab; re-reading it would double the
     // cost of every page load for no new information.
     const values = known ?? (await readTab(config.LOG_SHEET_NAME));
-    const expired = countExpiredRows(values, Date.now() - days * 86_400_000);
+    const expired = countRowsToDrop(values, config.LOG_MAX_ROWS);
     if (expired < 1) return 0;
 
     const sheets = getSheets();
