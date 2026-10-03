@@ -114,6 +114,9 @@ export const mutations = {
   moveOut: (row: number, reason: string) =>
     unwrap(client.api.roster['move-out']({ row }).post({ reason })),
 
+  /** Ticked several people and moved the lot out; each keeps their own reason. */
+  moveOutBulk: (rows: number[]) => unwrap(client.api.roster['move-out-bulk'].post({ rows })),
+
   /* ---- log viewer (/police/logs) ----
      Reads, but they live here with the other admin calls because they carry the
      same session cookie and are refused without it. */

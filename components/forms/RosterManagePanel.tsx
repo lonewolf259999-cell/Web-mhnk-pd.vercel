@@ -16,9 +16,16 @@ const STATUS_OPTIONS = ['', 'ออกจาก Discord', 'ถูกปลดอ
 /** Filter-only sentinel for "no exit reason set" — see the note in the filter. */
 const NORMAL = '__normal__';
 
-/* The confirm box serves two actions now: one person out of the system, or one
-   status onto everyone ticked. Both want the same "say what will happen, then
-   do it" shape, so they share the dialog and differ only in the payload. */
+/* Both caps mirror the ones the routes enforce. They are repeated here so an
+   over-large selection is refused in Thai, next to the button, instead of
+   coming back as a schema error. */
+const MAX_BULK_STATUS = 200;
+const MAX_BULK_MOVE = 20;
+
+/* The confirm box serves three actions now: one person out of the system, one
+   status onto everyone ticked, or everyone ticked out at once. All three want
+   the same "say what will happen, then do it" shape, so they share the dialog
+   and differ only in the payload. */
 type PendingConfirm = {
   title: string;
   message: string;
@@ -27,6 +34,7 @@ type PendingConfirm = {
 } & (
   | { kind: 'move-out'; row: number; reason: string }
   | { kind: 'bulk-status'; rows: number[]; status: string }
+  | { kind: 'bulk-move-out'; rows: number[] }
 );
 
 function statusClass(status: string): string {
@@ -247,13 +255,22 @@ export function RosterManagePanel() {
     }
   }
 
+  /* Naming them beats naming a number: a mis-click on the select-all box is
+     the one way a bulk action goes wrong, and a list makes that obvious while
+     it can still be cancelled. Ten is as many as the box shows before the
+     count takes over. */
+  function nameList(lines: string[]): string {
+    const rest = lines.length - 10;
+    return lines.slice(0, 10).join('\n') + (rest > 0 ? `\n… และอีก ${rest} คน` : '');
+  }
+
   function confirmBulkStatus() {
     if (selectedMembers.length === 0) return;
 
-    /* Naming them beats naming a number: a mis-click on the select-all box is
-       the one way this action goes wrong, and a list makes that obvious here. */
-    const names = selectedMembers.map((m) => `${m.code} ${stripTag(m.name).trim()}`);
-    const rest = names.length - 10;
+    if (selectedMembers.length > MAX_BULK_STATUS) {
+      showToast(`เปลี่ยนสถานะได้ครั้งละไม่เกิน ${MAX_BULK_STATUS} คน`, 'error');
+      return;
+    }
 
     setConfirming({
       kind: 'bulk-status',
@@ -261,11 +278,51 @@ export function RosterManagePanel() {
       status: bulkStatus,
       title: '⚠️ ยืนยันการเปลี่ยนสถานะหลายคน',
       message:
-        `เปลี่ยนสถานะ ${names.length} คน เป็น "${bulkStatus || '✅ ปกติ'}"\n\n` +
-        names.slice(0, 10).join('\n') +
-        (rest > 0 ? `\n… และอีก ${rest} คน` : ''),
+        `เปลี่ยนสถานะ ${selectedMembers.length} คน เป็น "${bulkStatus || '✅ ปกติ'}"\n\n` +
+        nameList(selectedMembers.map((m) => `${m.code} ${stripTag(m.name).trim()}`)),
       confirmLabel: 'เปลี่ยนสถานะ',
       danger: false,
+    });
+  }
+
+  function confirmBulkMoveOut() {
+    if (selectedMembers.length === 0) return;
+
+    /* Each person is moved out for whatever their own status says, so someone
+       still marked ปกติ has no reason to be moved out for. The server refuses
+       them too, but the fix is to set their status first — so they are named
+       here, before anything is sent. */
+    const unset = selectedMembers.filter((m) => !m.status);
+    if (unset.length > 0) {
+      showToast(
+        `ตั้งสถานะก่อน — ยังไม่มีสาเหตุ ${unset.length} คน: ` +
+          unset
+            .slice(0, 5)
+            .map((m) => m.code)
+            .join(', ') +
+          (unset.length > 5 ? ' …' : ''),
+        'error'
+      );
+      return;
+    }
+
+    if (selectedMembers.length > MAX_BULK_MOVE) {
+      showToast(`ย้ายออกได้ครั้งละไม่เกิน ${MAX_BULK_MOVE} คน`, 'error');
+      return;
+    }
+
+    setConfirming({
+      kind: 'bulk-move-out',
+      rows: selectedMembers.map((m) => m.row),
+      title: '⚠️ ยืนยันการย้ายออกหลายคน',
+      message:
+        `ต้องการย้าย ${selectedMembers.length} คน ออกจากระบบ?\n\n` +
+        nameList(
+          selectedMembers.map((m) => `${m.code} ${stripTag(m.name).trim()} — ${m.status}`)
+        ) +
+        '\n\n⚠️ ข้อมูลจะถูกลบจาก NamePD และไปอยู่ OutDC',
+      confirmLabel: 'ย้ายออกทั้งหมด',
+      danger: true,
     });
   }
 
@@ -316,10 +373,21 @@ export function RosterManagePanel() {
         const result = await mutations.moveOut(action.row, action.reason);
         showToast(result.message, 'success');
         log(`ย้ายออก: ${result.message}`);
-      } else {
+      } else if (action.kind === 'bulk-status') {
         const result = await mutations.setRosterStatusBulk(action.rows, action.status);
         showToast(result.message, 'success');
         log(`เปลี่ยนสถานะหลายคน: ${result.message}`);
+        setSelected(new Set());
+      } else {
+        const result = await mutations.moveOutBulk(action.rows);
+        showToast(result.message, 'success');
+        log(`ย้ายออกหลายคน: ${result.message}`);
+
+        /* The move succeeded even when an announcement did not, so the detail
+           goes to the log rather than turning the toast into a failure. */
+        if (result.warnings.length > 0) {
+          log(`WebHook ไม่สำเร็จ: ${result.warnings.join('; ')}`);
+        }
         setSelected(new Set());
       }
       await loadData();
@@ -541,6 +609,19 @@ export function RosterManagePanel() {
                     onClick={() => setSelected(new Set())}
                   >
                     ✖ ล้างการเลือก
+                  </button>
+
+                  {/* Last and pushed to the far edge: the one button here that
+                      cannot be undone should not sit under a stray click meant
+                      for the harmless ones beside it. */}
+                  <button
+                    type="button"
+                    className="btn-danger btn-sm"
+                    disabled={busy}
+                    style={{ marginLeft: 'auto' }}
+                    onClick={confirmBulkMoveOut}
+                  >
+                    🚫 ย้ายออกที่ติ๊ก
                   </button>
                 </div>
               )}

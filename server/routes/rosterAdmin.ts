@@ -6,14 +6,16 @@
 
 import { Elysia, t } from 'elysia';
 import {
-  EXIT_REASONS,
   getNamePDMembers,
   getOutDCMembers,
+  isExitReason,
+  moveManyToOutDC,
   moveToOutDC,
   sendExitWebhook,
   updateStatus,
   updateStatusMany,
   type ExitReason,
+  type MovedMember,
 } from '@/server/services/roster';
 import { ApiError } from '@/server/errors';
 import {
@@ -25,11 +27,51 @@ import { logEvent } from '@/server/services/opsLog';
 
 const rowParam = t.Object({ row: t.Numeric() });
 
+/** How long a bulk move spends announcing before it gives up on the rest. */
+const ANNOUNCE_BUDGET_MS = 5_000;
+
 function assertReason(reason: string): ExitReason {
-  if (!EXIT_REASONS.includes(reason as ExitReason)) {
-    throw new ApiError('Invalid reason', 400);
+  if (!isExitReason(reason)) throw new ApiError('Invalid reason', 400);
+  return reason;
+}
+
+/** Sheet row numbers, deduplicated; row 1 is the header, so anything below 2
+    arrived broken rather than naming a row worth writing to. */
+function cleanRows(rows: number[]): number[] {
+  const clean = [...new Set(rows)].filter((row) => Number.isInteger(row) && row >= 2);
+  if (clean.length === 0) throw new ApiError('ไม่มีแถวที่ถูกต้อง', 400);
+  return clean;
+}
+
+/* The two reasons that get announced in Discord, one post per person exactly
+   as a single departure does. Sequential, because a burst of webhook posts is
+   what Discord rate-limits — and a failure here is reported, never thrown: the
+   move already happened and an unsent announcement must not read as a failed
+   move. */
+async function announceDepartures(moved: MovedMember[]): Promise<string[]> {
+  const warnings: string[] = [];
+  const startedAt = Date.now();
+
+  for (const member of moved) {
+    if (member.reason !== 'ถูกปลดออก' && member.reason !== 'ติดต่อขอออก') continue;
+
+    const discordId = member.discordId.replace(/[<@>]/g, '');
+    if (!discordId) continue;
+
+    /* Each post allows itself REQUEST_TIMEOUT, so a Discord that has gone slow
+       could eat the whole function before the batch is through. The rows are
+       already moved by this point, so stopping and saying which announcements
+       did not go out is worth more than being killed with no response at all. */
+    if (Date.now() - startedAt > ANNOUNCE_BUDGET_MS) {
+      warnings.push(`${member.code} ${member.name}: ไม่ได้ส่งประกาศ (หมดเวลา)`);
+      continue;
+    }
+
+    const sent = await sendExitWebhook(member.reason, discordId);
+    if (!sent.success) warnings.push(`${member.code} ${member.name}: ${sent.error}`);
   }
-  return reason as ExitReason;
+
+  return warnings;
 }
 
 export const rosterAdminRoutes = new Elysia({ name: 'roster-admin' })
@@ -84,11 +126,7 @@ export const rosterAdminRoutes = new Elysia({ name: 'roster-admin' })
       const actor = await requirePermission(request, ROSTER_MANAGE);
       if (body.status !== '') assertReason(body.status);
 
-      /* Row 1 is the header and the client sends sheet row numbers, so anything
-         below 2 is a bug on the way in rather than a row to overwrite. */
-      const rows = [...new Set(body.rows)].filter((row) => Number.isInteger(row) && row >= 2);
-      if (rows.length === 0) throw new ApiError('ไม่มีแถวที่ถูกต้องให้อัปเดต', 400);
-
+      const rows = cleanRows(body.rows);
       await updateStatusMany(rows, body.status);
 
       const display = body.status || '✅ ปกติ';
@@ -148,4 +186,40 @@ export const rosterAdminRoutes = new Elysia({ name: 'roster-admin' })
       };
     },
     { params: rowParam, body: t.Object({ reason: t.String() }) }
+  )
+
+  /* Tick several, move them all out. No reason in the body: moveManyToOutDC
+     takes each person's reason from their own status cell, so this cannot be
+     asked to move someone out for something the sheet does not say. */
+  .post(
+    '/roster/move-out-bulk',
+    async ({ body, request }) => {
+      const actor = await requirePermission(request, ROSTER_MANAGE);
+
+      const moved = await moveManyToOutDC(cleanRows(body.rows));
+
+      await logEvent(
+        'INFO',
+        'roster',
+        `ย้ายออกจากระบบ ${moved.length} คน — ` +
+          moved.map((m) => `${m.code} ${m.name} (${m.reason})`).join(', '),
+        { actor, detail: { rows: moved.map((m) => m.row) } }
+      );
+
+      const warnings = await announceDepartures(moved);
+      const suffix = warnings.length > 0 ? ` (⚠️ WebHook ไม่สำเร็จ ${warnings.length} ราย)` : '';
+
+      return {
+        success: true,
+        message: `ย้ายออก ${moved.length} คน แล้ว${suffix}`,
+        data: moved,
+        warnings,
+      };
+    },
+    {
+      /* The Sheets work is four calls whatever the headcount, so the cap is
+         about the announcements: those are one sequential HTTP post each, and
+         the function has ten seconds for the lot. */
+      body: t.Object({ rows: t.Array(t.Numeric(), { minItems: 1, maxItems: 20 }) }),
+    }
   );

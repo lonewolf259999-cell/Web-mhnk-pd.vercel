@@ -15,6 +15,9 @@ export const EXIT_REASONS = [
 
 export type ExitReason = (typeof EXIT_REASONS)[number];
 
+export const isExitReason = (value: string): value is ExitReason =>
+  (EXIT_REASONS as readonly string[]).includes(value);
+
 export interface RosterMember {
   row: number;
   code: string;
@@ -96,8 +99,15 @@ export async function updateStatusMany(rows: number[], status: string): Promise<
 
 export const updateStatus = (row: number, status: string) => updateStatusMany([row], status);
 
-/** First blank row in OutDC from row 3 down, judged by the name column. */
-async function findEmptyOutDCRow(): Promise<number> {
+/**
+ * The first `count` blank rows in OutDC from row 3 down, judged by the name
+ * column.
+ *
+ * Blank rows are collected one by one rather than as a run starting at the
+ * first gap: OutDC has gaps in it, so a batch written consecutively from the
+ * first blank row would land on top of whoever sits below that gap.
+ */
+async function findEmptyOutDCRows(count: number): Promise<number[]> {
   const res = await getSheets().spreadsheets.values.get({
     spreadsheetId: config.ROSTER_SHEET_ID,
     range: `${config.ROSTER_OUT_SHEET_NAME}!D3:D`,
@@ -105,11 +115,29 @@ async function findEmptyOutDCRow(): Promise<number> {
   });
 
   const rows = res.data.values || [];
-  for (let i = 0; i < rows.length; i++) {
-    if (!rows[i]?.[0] || !String(rows[i][0]).trim()) return 3 + i;
+  const found: number[] = [];
+
+  for (let i = 0; i < rows.length && found.length < count; i++) {
+    if (!rows[i]?.[0] || !String(rows[i][0]).trim()) found.push(3 + i);
   }
-  return 3 + rows.length;
+
+  // Past the end of the used range every row is blank.
+  for (let i = rows.length; found.length < count; i++) found.push(3 + i);
+
+  return found;
 }
+
+/* What a departure vacates on NamePD. C (code), F (rank), I (days) and
+   L (duration) are deliberately kept, which is what breaks this into five
+   spans instead of one — and spans rather than 16 single cells because a bulk
+   move clears every selected row in one request. */
+const VACATED_SPANS = ['B', 'D:E', 'G:H', 'J:K', 'M:U'] as const;
+
+const vacatedRanges = (row: number) =>
+  VACATED_SPANS.map((span) => {
+    const [from, to] = span.split(':');
+    return `${config.ROSTER_SHEET_NAME}!${from}${row}:${to ?? from}${row}`;
+  });
 
 export async function moveToOutDC(row: number, reason: ExitReason) {
   const sheets = getSheets();
@@ -129,7 +157,7 @@ export async function moveToOutDC(row: number, reason: ExitReason) {
 
   // The sheet's own status column wins when set; the request's reason is the fallback.
   const finalReason = status || reason;
-  const targetRow = await findEmptyOutDCRow();
+  const [targetRow] = await findEmptyOutDCRows(1);
 
   await sheets.spreadsheets.values.update({
     spreadsheetId: config.ROSTER_SHEET_ID,
@@ -145,19 +173,104 @@ export async function moveToOutDC(row: number, reason: ExitReason) {
     },
   });
 
-  /* Clear the vacated NamePD cells. C (code), F (rank), I (days) and
-     L (duration) are deliberately kept. One batchClear replaces the 16
-     sequential writes the v2 service made. */
-  const columns = ['B', 'D', 'E', 'G', 'H', 'J', 'K', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U'];
-
+  /* One batchClear replaces the 16 sequential writes the v2 service made. */
   await sheets.spreadsheets.values.batchClear({
     spreadsheetId: config.ROSTER_SHEET_ID,
-    requestBody: {
-      ranges: columns.map((col) => `${config.ROSTER_SHEET_NAME}!${col}${row}`),
-    },
+    requestBody: { ranges: vacatedRanges(row) },
   });
 
   return { code, name, discordId };
+}
+
+export interface MovedMember {
+  row: number;
+  code: string;
+  name: string;
+  discordId: string;
+  reason: ExitReason;
+}
+
+/**
+ * The bulk departure behind the console's "ย้ายออกที่ติ๊ก" button.
+ *
+ * Looping the single-row move would spend three Sheets round trips per person,
+ * which is both the shared write quota and the function's 10s budget gone by
+ * the fifth one. This reads every source row in one call, places them all in
+ * one write and vacates them all in one clear — four calls whatever the
+ * headcount.
+ *
+ * Nothing is written until every row has been read and checked, so a batch
+ * that cannot be completed in full leaves both sheets untouched. Each person's
+ * reason is their own status cell and nothing else: the caller cannot hand one
+ * in, and someone still marked ปกติ is refused by name rather than moved out
+ * for an invented reason.
+ */
+export async function moveManyToOutDC(rows: number[]): Promise<MovedMember[]> {
+  if (rows.length === 0) return [];
+
+  const sheets = getSheets();
+
+  const read = await sheets.spreadsheets.values.batchGet({
+    spreadsheetId: config.ROSTER_SHEET_ID,
+    ranges: rows.map((row) => `${config.ROSTER_SHEET_NAME}!B${row}:N${row}`),
+  });
+
+  const valueRanges = read.data.valueRanges || [];
+  const members: MovedMember[] = [];
+  const payload: string[][] = [];
+  const refused: string[] = [];
+
+  rows.forEach((row, i) => {
+    /* Sheets drops trailing empty cells, so a short row is padded back to
+       B–N rather than read with the columns shifted along. */
+    const values = (valueRanges[i]?.values?.[0] as string[] | undefined) ?? [];
+    const cells = Array.from({ length: 13 }, (_, c) => (values[c] ?? '').trim());
+    const [, code, name, discordId, , , , , , , , , status] = cells;
+
+    if (!name) {
+      refused.push(`แถว ${row}: ไม่พบข้อมูลใน NamePD`);
+      return;
+    }
+    if (!isExitReason(status)) {
+      refused.push(`${code} ${name}: ยังไม่ได้ตั้งสาเหตุที่ย้ายออก`);
+      return;
+    }
+
+    members.push({ row, code, name, discordId, reason: status });
+    payload.push(cells);
+  });
+
+  /* Joined with a separator rather than newlines, and cut short: this lands
+     in a one-line toast on the console, which would run the lines together
+     anyway and has no room for twenty of them. */
+  if (refused.length > 0) {
+    const shown = refused.slice(0, 5).join(' • ');
+    const rest = refused.length - 5;
+    throw new ApiError(shown + (rest > 0 ? ` • และอีก ${rest} รายการ` : ''), 400);
+  }
+
+  const targets = await findEmptyOutDCRows(members.length);
+
+  /* OutDC first, then NamePD — the same order the single move uses. A failure
+     between the two leaves a duplicate, which is recoverable; the other order
+     would lose the row. */
+  await sheets.spreadsheets.values.batchUpdate({
+    spreadsheetId: config.ROSTER_SHEET_ID,
+    requestBody: {
+      valueInputOption: 'USER_ENTERED',
+      data: targets.map((target, i) => ({
+        range: `${config.ROSTER_OUT_SHEET_NAME}!B${target}:N${target}`,
+        values: [payload[i]],
+      })),
+    },
+  });
+
+  await sheets.spreadsheets.values.batchClear({
+    spreadsheetId: config.ROSTER_SHEET_ID,
+    requestBody: { ranges: members.flatMap((m) => vacatedRanges(m.row)) },
+  });
+
+  return members;
 }
 
 /** Announces a departure in Discord. Failure is reported, never thrown. */
