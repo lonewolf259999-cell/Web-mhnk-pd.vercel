@@ -8,6 +8,7 @@ import { Elysia, t } from 'elysia';
 import {
   getNamePDMembers,
   getOutDCMembers,
+  isAnnounced,
   isExitReason,
   moveManyToOutDC,
   moveToOutDC,
@@ -29,6 +30,19 @@ const rowParam = t.Object({ row: t.Numeric() });
 
 /** How long a bulk move spends announcing before it gives up on the rest. */
 const ANNOUNCE_BUDGET_MS = 5_000;
+
+/* Two caps, because a departure's cost depends on its reason.
+
+   Headcount is limited only by how large one request may get: the Sheets work
+   is four calls either way, but the read names every row in its query string
+   and the clear names five ranges per row, and one clear is what keeps the
+   batch all-or-nothing. Fifty keeps both comfortably small.
+
+   The announced reasons are limited by time instead — one sequential Discord
+   post each inside a ten-second function. That is the tighter of the two, and
+   moveManyToOutDC checks it once it has read what each person's reason is. */
+const MAX_BULK_MOVE = 50;
+const MAX_BULK_ANNOUNCE = 20;
 
 function assertReason(reason: string): ExitReason {
   if (!isExitReason(reason)) throw new ApiError('Invalid reason', 400);
@@ -53,7 +67,7 @@ async function announceDepartures(moved: MovedMember[]): Promise<string[]> {
   const startedAt = Date.now();
 
   for (const member of moved) {
-    if (member.reason !== 'ถูกปลดออก' && member.reason !== 'ติดต่อขอออก') continue;
+    if (!isAnnounced(member.reason)) continue;
 
     const discordId = member.discordId.replace(/[<@>]/g, '');
     if (!discordId) continue;
@@ -196,7 +210,9 @@ export const rosterAdminRoutes = new Elysia({ name: 'roster-admin' })
     async ({ body, request }) => {
       const actor = await requirePermission(request, ROSTER_MANAGE);
 
-      const moved = await moveManyToOutDC(cleanRows(body.rows));
+      const moved = await moveManyToOutDC(cleanRows(body.rows), {
+        maxAnnounced: MAX_BULK_ANNOUNCE,
+      });
 
       await logEvent(
         'INFO',
@@ -217,9 +233,8 @@ export const rosterAdminRoutes = new Elysia({ name: 'roster-admin' })
       };
     },
     {
-      /* The Sheets work is four calls whatever the headcount, so the cap is
-         about the announcements: those are one sequential HTTP post each, and
-         the function has ten seconds for the lot. */
-      body: t.Object({ rows: t.Array(t.Numeric(), { minItems: 1, maxItems: 20 }) }),
+      body: t.Object({
+        rows: t.Array(t.Numeric(), { minItems: 1, maxItems: MAX_BULK_MOVE }),
+      }),
     }
   );

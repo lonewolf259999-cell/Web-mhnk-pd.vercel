@@ -18,6 +18,13 @@ export type ExitReason = (typeof EXIT_REASONS)[number];
 export const isExitReason = (value: string): value is ExitReason =>
   (EXIT_REASONS as readonly string[]).includes(value);
 
+/* The two departures that are announced in Discord. The other two are not, and
+   that difference is what a batch's size is really limited by — so it is named
+   once here and read by both the route that posts and the batch that counts. */
+const ANNOUNCED_REASONS: readonly ExitReason[] = ['ถูกปลดออก', 'ติดต่อขอออก'];
+
+export const isAnnounced = (reason: ExitReason) => ANNOUNCED_REASONS.includes(reason);
+
 export interface RosterMember {
   row: number;
   code: string;
@@ -205,7 +212,10 @@ export interface MovedMember {
  * in, and someone still marked ปกติ is refused by name rather than moved out
  * for an invented reason.
  */
-export async function moveManyToOutDC(rows: number[]): Promise<MovedMember[]> {
+export async function moveManyToOutDC(
+  rows: number[],
+  { maxAnnounced }: { maxAnnounced: number }
+): Promise<MovedMember[]> {
   if (rows.length === 0) return [];
 
   const sheets = getSheets();
@@ -247,6 +257,19 @@ export async function moveManyToOutDC(rows: number[]): Promise<MovedMember[]> {
     const shown = refused.slice(0, 5).join(' • ');
     const rest = refused.length - 5;
     throw new ApiError(shown + (rest > 0 ? ` • และอีก ${rest} รายการ` : ''), 400);
+  }
+
+  /* The Sheets work is a fixed four calls, so what actually limits a batch is
+     the Discord posts — and only two of the four reasons have one. Counted
+     here, where the reasons are finally known, and still before anything has
+     been written: a batch too large to announce moves nobody. */
+  const announced = members.filter((m) => isAnnounced(m.reason)).length;
+  if (announced > maxAnnounced) {
+    throw new ApiError(
+      `"ถูกปลดออก" และ "ติดต่อขอออก" ต้องประกาศใน Discord ทีละคน ` +
+        `จึงย้ายได้ครั้งละไม่เกิน ${maxAnnounced} คน (ติ๊กมา ${announced} คน)`,
+      400
+    );
   }
 
   const targets = await findEmptyOutDCRows(members.length);

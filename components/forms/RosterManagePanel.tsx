@@ -16,11 +16,17 @@ const STATUS_OPTIONS = ['', 'ออกจาก Discord', 'ถูกปลดอ
 /** Filter-only sentinel for "no exit reason set" — see the note in the filter. */
 const NORMAL = '__normal__';
 
-/* Both caps mirror the ones the routes enforce. They are repeated here so an
+/* These mirror the caps the routes enforce. They are repeated here so an
    over-large selection is refused in Thai, next to the button, instead of
-   coming back as a schema error. */
+   coming back as a schema error — the server is still the one enforcing them.
+
+   Why two numbers for one button: "ถูกปลดออก" and "ติดต่อขอออก" are announced
+   in Discord one post at a time, so they are what makes a batch slow. The
+   other two reasons post nothing and are limited only by request size. */
 const MAX_BULK_STATUS = 200;
-const MAX_BULK_MOVE = 20;
+const MAX_BULK_MOVE = 50;
+const MAX_BULK_ANNOUNCE = 20;
+const ANNOUNCED_REASONS = ['ถูกปลดออก', 'ติดต่อขอออก'];
 
 /* The confirm box serves three actions now: one person out of the system, one
    status onto everyone ticked, or everyone ticked out at once. All three want
@@ -311,6 +317,16 @@ export function RosterManagePanel() {
       return;
     }
 
+    const announced = selectedMembers.filter((m) => ANNOUNCED_REASONS.includes(m.status)).length;
+    if (announced > MAX_BULK_ANNOUNCE) {
+      showToast(
+        `"ถูกปลดออก" และ "ติดต่อขอออก" ต้องประกาศใน Discord ทีละคน ` +
+          `จึงย้ายได้ครั้งละไม่เกิน ${MAX_BULK_ANNOUNCE} คน (ติ๊กมา ${announced} คน)`,
+        'error'
+      );
+      return;
+    }
+
     setConfirming({
       kind: 'bulk-move-out',
       rows: selectedMembers.map((m) => m.row),
@@ -320,6 +336,10 @@ export function RosterManagePanel() {
         nameList(
           selectedMembers.map((m) => `${m.code} ${stripTag(m.name).trim()} — ${m.status}`)
         ) +
+        /* Said before confirming, not after: a mass departure that posts
+           nothing in Discord and one that tags thirty people are the same
+           click otherwise. */
+        (announced > 0 ? `\n\n📢 จะประกาศใน Discord ${announced} คน` : '') +
         '\n\n⚠️ ข้อมูลจะถูกลบจาก NamePD และไปอยู่ OutDC',
       confirmLabel: 'ย้ายออกทั้งหมด',
       danger: true,
