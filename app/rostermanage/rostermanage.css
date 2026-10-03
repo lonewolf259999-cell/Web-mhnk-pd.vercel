@@ -110,6 +110,24 @@
     border-radius: 8px; color: #fff; font-size: 14px; cursor: pointer;
 }
 
+/* Tick several people, then pick what happens to all of them. */
+.rostermanage-page .bulk-bar {
+    display: flex; gap: 10px; align-items: center; flex-wrap: wrap;
+    background: #252545; border: 1px solid #f0c04055; border-radius: 8px;
+    padding: 10px 12px; margin-bottom: 15px;
+}
+.rostermanage-page .bulk-bar .bulk-count { color: #f0c040; font-weight: 600; font-size: 13px; }
+.rostermanage-page .bulk-bar select {
+    padding: 8px 10px; background: #1a1a2e; border: 1px solid #3a3a5a;
+    border-radius: 6px; color: #fff; font-size: 13px; cursor: pointer;
+}
+
+.rostermanage-page .pick-col { width: 34px; text-align: center; }
+.rostermanage-page .pick-col input[type="checkbox"] {
+    width: 16px; height: 16px; cursor: pointer; accent-color: #f0c040; vertical-align: middle;
+}
+.rostermanage-page .pick-col input[type="checkbox"]:disabled { cursor: not-allowed; opacity: 0.4; }
+
 .rostermanage-page .table-wrap { max-height: 500px; overflow-y: auto; border: 1px solid #2a2a4a; border-radius: 8px; }
 .rostermanage-page .table-wrap table { width: 100%; border-collapse: collapse; table-layout: auto; }
 .rostermanage-page .table-wrap th, .rostermanage-page .table-wrap td {

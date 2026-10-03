@@ -107,6 +107,10 @@ export const mutations = {
   setRosterStatus: (row: number, status: string) =>
     unwrap(client.api.roster.status({ row }).put({ status })),
 
+  /** Ticked several people in the console and picked one status for all of them. */
+  setRosterStatusBulk: (rows: number[], status: string) =>
+    unwrap(client.api.roster['status-bulk'].put({ rows, status })),
+
   moveOut: (row: number, reason: string) =>
     unwrap(client.api.roster['move-out']({ row }).post({ reason })),
 

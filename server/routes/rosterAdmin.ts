@@ -12,6 +12,7 @@ import {
   moveToOutDC,
   sendExitWebhook,
   updateStatus,
+  updateStatusMany,
   type ExitReason,
 } from '@/server/services/roster';
 import { ApiError } from '@/server/errors';
@@ -68,6 +69,50 @@ export const rosterAdminRoutes = new Elysia({ name: 'roster-admin' })
       return { success: true, message: `อัปเดตสถานะเป็น "${display}" แล้ว` };
     },
     { params: rowParam, body: t.Object({ status: t.String() }) }
+  )
+
+  /* The console's bulk action: tick several people, pick one status. Kept a
+     separate path from /roster/status/:row so Eden has no static-vs-param
+     ambiguity to resolve, and so the single-row call keeps its own shape.
+
+     One request, one Sheets write and one log line for the whole batch — the
+     per-row loop it replaces would have spent a write and a log line each, and
+     opsLog caps itself at 20 sheet writes a minute. */
+  .put(
+    '/roster/status-bulk',
+    async ({ body, request }) => {
+      const actor = await requirePermission(request, ROSTER_MANAGE);
+      if (body.status !== '') assertReason(body.status);
+
+      /* Row 1 is the header and the client sends sheet row numbers, so anything
+         below 2 is a bug on the way in rather than a row to overwrite. */
+      const rows = [...new Set(body.rows)].filter((row) => Number.isInteger(row) && row >= 2);
+      if (rows.length === 0) throw new ApiError('ไม่มีแถวที่ถูกต้องให้อัปเดต', 400);
+
+      await updateStatusMany(rows, body.status);
+
+      const display = body.status || '✅ ปกติ';
+      await logEvent(
+        'INFO',
+        'roster',
+        `เปลี่ยนสถานะ ${rows.length} คน → "${body.status}" (แถว ${rows.join(', ')})`,
+        { actor }
+      );
+
+      return {
+        success: true,
+        message: `อัปเดตสถานะ ${rows.length} คน เป็น "${display}" แล้ว`,
+        data: { rows },
+      };
+    },
+    {
+      body: t.Object({
+        /* The cap is what keeps one click from turning into an unbounded write;
+           the page offers nothing that selects more than a screen's worth. */
+        rows: t.Array(t.Numeric(), { minItems: 1, maxItems: 200 }),
+        status: t.String(),
+      }),
+    }
   )
 
   .post(

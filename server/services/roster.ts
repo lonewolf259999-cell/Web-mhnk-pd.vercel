@@ -76,14 +76,25 @@ async function readSheet(sheetName: string): Promise<RosterMember[]> {
 export const getNamePDMembers = () => readSheet(config.ROSTER_SHEET_NAME);
 export const getOutDCMembers = () => readSheet(config.ROSTER_OUT_SHEET_NAME);
 
-export async function updateStatus(row: number, status: string): Promise<void> {
-  await getSheets().spreadsheets.values.update({
+/* One cell per call would be one Sheets write per person, and this app shares
+   its write quota with the bot — so the console's "tick several, set one status"
+   action arrives here as a batch and leaves as a single write. */
+export async function updateStatusMany(rows: number[], status: string): Promise<void> {
+  if (rows.length === 0) return;
+
+  await getSheets().spreadsheets.values.batchUpdate({
     spreadsheetId: config.ROSTER_SHEET_ID,
-    range: `${config.ROSTER_SHEET_NAME}!N${row}`,
-    valueInputOption: 'USER_ENTERED',
-    requestBody: { values: [[status]] },
+    requestBody: {
+      valueInputOption: 'USER_ENTERED',
+      data: rows.map((row) => ({
+        range: `${config.ROSTER_SHEET_NAME}!N${row}`,
+        values: [[status]],
+      })),
+    },
   });
 }
+
+export const updateStatus = (row: number, status: string) => updateStatusMany([row], status);
 
 /** First blank row in OutDC from row 3 down, judged by the name column. */
 async function findEmptyOutDCRow(): Promise<number> {
