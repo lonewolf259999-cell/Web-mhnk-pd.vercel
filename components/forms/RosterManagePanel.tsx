@@ -235,7 +235,8 @@ export function RosterManagePanel() {
     const missing = selectedMembers.filter((m) => !bareId(m.discordId)).length;
 
     try {
-      await navigator.clipboard.writeText(ids.map((id) => '<@' + id + '>').join(' '));
+      // One mention per line: that is how they get pasted into Discord.
+      await navigator.clipboard.writeText(ids.map((id) => '<@' + id + '>').join('\n'));
       showToast(
         `คัดลอก ${ids.length} ID แล้ว` + (missing > 0 ? ` (ข้าม ${missing} คนที่ไม่มี ID)` : ''),
         'success'
