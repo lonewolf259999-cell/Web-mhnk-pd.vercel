@@ -157,6 +157,10 @@
 .rostermanage-page .toast {
     position: fixed; top: 20px; right: 20px; padding: 12px 20px; border-radius: 8px;
     color: #fff; font-weight: 600; z-index: 999; display: none; animation: rm-fadeIn 0.3s;
+    /* A refused bulk action explains itself in a sentence, and this box is
+       pinned to the right edge — without a width it would run off the left of
+       a phone screen instead of wrapping. */
+    max-width: min(440px, calc(100vw - 40px)); white-space: pre-line; line-height: 1.45;
 }
 .rostermanage-page .toast.success { background: #22c55e; }
 .rostermanage-page .toast.error { background: #ef4444; }
