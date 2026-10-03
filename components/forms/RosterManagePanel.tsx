@@ -61,6 +61,61 @@ function statusText(status: string): string {
 
 const stripTag = (name: string) => name.replace(/\[MHNK-PD\]/g, '');
 
+/**
+ * One table's worth of ticking.
+ *
+ * Each table keeps its own selection rather than sharing one: row numbers are
+ * per sheet, so row 5 is one person on NamePD and a different one on OutDC,
+ * and ticking in one tab should not follow you into the other.
+ */
+function useTickSelection(visible: RosterMember[]) {
+  const [selected, setSelected] = useState<Set<number>>(new Set());
+
+  const visibleRows = useMemo(() => new Set(visible.map((m) => m.row)), [visible]);
+
+  /* A tick that a filter change scrolls out of view would stay invisible and
+     still be acted on, so the selection is trimmed to what is on screen.
+     Returning the same Set when nothing dropped is what stops this looping. */
+  useEffect(() => {
+    setSelected((prev) => {
+      if (prev.size === 0) return prev;
+      const next = new Set<number>();
+      for (const row of prev) if (visibleRows.has(row)) next.add(row);
+      return next.size === prev.size ? prev : next;
+    });
+  }, [visibleRows]);
+
+  /* Everything on screen counts and acts on this list, never on the raw Set:
+     it is filtered through the visible rows, so the number on a bulk bar is
+     always exactly what the buttons beside it will touch. */
+  const members = useMemo(() => visible.filter((m) => selected.has(m.row)), [visible, selected]);
+
+  const allSelected = visible.length > 0 && members.length === visible.length;
+
+  const toggleRow = (row: number) =>
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (!next.delete(row)) next.add(row);
+      return next;
+    });
+
+  const toggleAll = () =>
+    setSelected((prev) =>
+      prev.size === visible.length ? new Set() : new Set(visible.map((m) => m.row))
+    );
+
+  const clear = useCallback(() => setSelected(new Set()), []);
+
+  return {
+    members,
+    allSelected,
+    toggleRow,
+    toggleAll,
+    clear,
+    isTicked: (row: number) => selected.has(row),
+  };
+}
+
 export function RosterManagePanel() {
   const auth = useDiscordAuth('roster', true);
   const [toast, showToast] = useToastState();
@@ -86,9 +141,8 @@ export function RosterManagePanel() {
   const [searchOut, setSearchOut] = useState('');
 
   /* Ticked people are held as sheet row numbers, not table positions: both
-     filtering and reloading reshuffle the table, while the row number is what
+     filtering and reloading reshuffle a table, while the row number is what
      every write is addressed by. */
-  const [selected, setSelected] = useState<Set<number>>(new Set());
   const [bulkStatus, setBulkStatus] = useState('');
 
   const [confirming, setConfirming] = useState<PendingConfirm | null>(null);
@@ -143,7 +197,8 @@ export function RosterManagePanel() {
     setLoaded(false);
     setNamePD([]);
     setOutDC([]);
-    setSelected(new Set());
+    pd.clear();
+    out.clear();
     auth.disconnect();
     log('ออกจากระบบแล้ว');
   }
@@ -194,59 +249,25 @@ export function RosterManagePanel() {
     );
   }, [outDC, searchOut]);
 
-  const visibleRows = useMemo(() => new Set(visibleNamePD.map((m) => m.row)), [visibleNamePD]);
-
-  /* A tick that a filter change scrolls out of view would stay invisible and
-     still be written to, so the selection is trimmed to what is on screen.
-     Returning the same Set when nothing dropped is what stops this looping. */
-  useEffect(() => {
-    setSelected((prev) => {
-      if (prev.size === 0) return prev;
-      const next = new Set<number>();
-      for (const row of prev) if (visibleRows.has(row)) next.add(row);
-      return next.size === prev.size ? prev : next;
-    });
-  }, [visibleRows]);
-
-  const selectedMembers = useMemo(
-    () => visibleNamePD.filter((m) => selected.has(m.row)),
-    [visibleNamePD, selected]
-  );
-
-  /* Everything on screen counts and acts on selectedMembers, never on the raw
-      Set: that list is filtered through the visible rows, so the number on the
-      bar is always exactly what the buttons beside it will touch. */
-  const allVisibleSelected =
-    visibleNamePD.length > 0 && selectedMembers.length === visibleNamePD.length;
-
-  function toggleRow(row: number) {
-    setSelected((prev) => {
-      const next = new Set(prev);
-      if (!next.delete(row)) next.add(row);
-      return next;
-    });
-  }
-
-  function toggleAllVisible() {
-    setSelected((prev) =>
-      prev.size === visibleNamePD.length ? new Set() : new Set(visibleNamePD.map((m) => m.row))
-    );
-  }
+  /* One per table. NamePD's drives the writes; OutDC's only ever gets copied
+     from, because an archive has nothing left to change. */
+  const pd = useTickSelection(visibleNamePD);
+  const out = useTickSelection(visibleOutDC);
 
   const bareId = (raw: string) => raw.replace(/[<@>]/g, '').trim();
 
-  async function copySelectedIds() {
+  async function copyIds(members: RosterMember[]) {
     /* The sheet holds some ids bare and some already wrapped, so strip before
        wrapping — otherwise the mention comes out doubled and pings nobody.
        Deduplicated because the same id twice is noise in a Discord message. */
-    const ids = [...new Set(selectedMembers.map((m) => bareId(m.discordId)).filter(Boolean))];
+    const ids = [...new Set(members.map((m) => bareId(m.discordId)).filter(Boolean))];
 
     if (ids.length === 0) {
       showToast('คนที่ติ๊กไว้ไม่มี Discord ID', 'error');
       return;
     }
 
-    const missing = selectedMembers.filter((m) => !bareId(m.discordId)).length;
+    const missing = members.filter((m) => !bareId(m.discordId)).length;
 
     try {
       // One mention per line: that is how they get pasted into Discord.
@@ -271,34 +292,34 @@ export function RosterManagePanel() {
   }
 
   function confirmBulkStatus() {
-    if (selectedMembers.length === 0) return;
+    if (pd.members.length === 0) return;
 
-    if (selectedMembers.length > MAX_BULK_STATUS) {
+    if (pd.members.length > MAX_BULK_STATUS) {
       showToast(`เปลี่ยนสถานะได้ครั้งละไม่เกิน ${MAX_BULK_STATUS} คน`, 'error');
       return;
     }
 
     setConfirming({
       kind: 'bulk-status',
-      rows: selectedMembers.map((m) => m.row),
+      rows: pd.members.map((m) => m.row),
       status: bulkStatus,
       title: '⚠️ ยืนยันการเปลี่ยนสถานะหลายคน',
       message:
-        `เปลี่ยนสถานะ ${selectedMembers.length} คน เป็น "${bulkStatus || '✅ ปกติ'}"\n\n` +
-        nameList(selectedMembers.map((m) => `${m.code} ${stripTag(m.name).trim()}`)),
+        `เปลี่ยนสถานะ ${pd.members.length} คน เป็น "${bulkStatus || '✅ ปกติ'}"\n\n` +
+        nameList(pd.members.map((m) => `${m.code} ${stripTag(m.name).trim()}`)),
       confirmLabel: 'เปลี่ยนสถานะ',
       danger: false,
     });
   }
 
   function confirmBulkMoveOut() {
-    if (selectedMembers.length === 0) return;
+    if (pd.members.length === 0) return;
 
     /* Each person is moved out for whatever their own status says, so someone
        still marked ปกติ has no reason to be moved out for. The server refuses
        them too, but the fix is to set their status first — so they are named
        here, before anything is sent. */
-    const unset = selectedMembers.filter((m) => !m.status);
+    const unset = pd.members.filter((m) => !m.status);
     if (unset.length > 0) {
       showToast(
         `ตั้งสถานะก่อน — ยังไม่มีสาเหตุ ${unset.length} คน: ` +
@@ -312,12 +333,12 @@ export function RosterManagePanel() {
       return;
     }
 
-    if (selectedMembers.length > MAX_BULK_MOVE) {
+    if (pd.members.length > MAX_BULK_MOVE) {
       showToast(`ย้ายออกได้ครั้งละไม่เกิน ${MAX_BULK_MOVE} คน`, 'error');
       return;
     }
 
-    const announced = selectedMembers.filter((m) => ANNOUNCED_REASONS.includes(m.status)).length;
+    const announced = pd.members.filter((m) => ANNOUNCED_REASONS.includes(m.status)).length;
     if (announced > MAX_BULK_ANNOUNCE) {
       showToast(
         `"ถูกปลดออก" และ "ติดต่อขอออก" ต้องประกาศใน Discord ทีละคน ` +
@@ -329,12 +350,12 @@ export function RosterManagePanel() {
 
     setConfirming({
       kind: 'bulk-move-out',
-      rows: selectedMembers.map((m) => m.row),
+      rows: pd.members.map((m) => m.row),
       title: '⚠️ ยืนยันการย้ายออกหลายคน',
       message:
-        `ต้องการย้าย ${selectedMembers.length} คน ออกจากระบบ?\n\n` +
+        `ต้องการย้าย ${pd.members.length} คน ออกจากระบบ?\n\n` +
         nameList(
-          selectedMembers.map((m) => `${m.code} ${stripTag(m.name).trim()} — ${m.status}`)
+          pd.members.map((m) => `${m.code} ${stripTag(m.name).trim()} — ${m.status}`)
         ) +
         /* Said before confirming, not after: a mass departure that posts
            nothing in Discord and one that tags thirty people are the same
@@ -397,7 +418,7 @@ export function RosterManagePanel() {
         const result = await mutations.setRosterStatusBulk(action.rows, action.status);
         showToast(result.message, 'success');
         log(`เปลี่ยนสถานะหลายคน: ${result.message}`);
-        setSelected(new Set());
+        pd.clear();
       } else {
         const result = await mutations.moveOutBulk(action.rows);
         showToast(result.message, 'success');
@@ -408,7 +429,7 @@ export function RosterManagePanel() {
         if (result.warnings.length > 0) {
           log(`WebHook ไม่สำเร็จ: ${result.warnings.join('; ')}`);
         }
-        setSelected(new Set());
+        pd.clear();
       }
       await loadData();
     } catch (err) {
@@ -589,9 +610,9 @@ export function RosterManagePanel() {
               {/* Sits above the table rather than inside it: the table body
                   scrolls in a 500px box, and a bar in there would scroll away
                   from the ticks it acts on. */}
-              {selectedMembers.length > 0 && (
+              {pd.members.length > 0 && (
                 <div className="bulk-bar">
-                  <span className="bulk-count">☑️ ติ๊กไว้ {selectedMembers.length} คน</span>
+                  <span className="bulk-count">☑️ ติ๊กไว้ {pd.members.length} คน</span>
 
                   <select
                     value={bulkStatus}
@@ -618,7 +639,7 @@ export function RosterManagePanel() {
                   <button
                     type="button"
                     className="btn-secondary btn-sm"
-                    onClick={() => void copySelectedIds()}
+                    onClick={() => void copyIds(pd.members)}
                   >
                     📋 ก๊อป ID Discord
                   </button>
@@ -626,7 +647,7 @@ export function RosterManagePanel() {
                   <button
                     type="button"
                     className="btn-secondary btn-sm"
-                    onClick={() => setSelected(new Set())}
+                    onClick={pd.clear}
                   >
                     ✖ ล้างการเลือก
                   </button>
@@ -654,14 +675,14 @@ export function RosterManagePanel() {
                         <th className="pick-col">
                           <input
                             type="checkbox"
-                            checked={allVisibleSelected}
+                            checked={pd.allSelected}
                             ref={(el) => {
                               if (el) {
-                                el.indeterminate = selectedMembers.length > 0 && !allVisibleSelected;
+                                el.indeterminate = pd.members.length > 0 && !pd.allSelected;
                               }
                             }}
                             disabled={busy || visibleNamePD.length === 0}
-                            onChange={toggleAllVisible}
+                            onChange={pd.toggleAll}
                             aria-label="ติ๊กทุกคนที่เห็นอยู่"
                             title="ติ๊กทุกคนที่เห็นอยู่ (ตามตัวกรอง)"
                           />
@@ -694,9 +715,9 @@ export function RosterManagePanel() {
                           <td className="pick-col">
                             <input
                               type="checkbox"
-                              checked={selected.has(m.row)}
+                              checked={pd.isTicked(m.row)}
                               disabled={busy}
-                              onChange={() => toggleRow(m.row)}
+                              onChange={() => pd.toggleRow(m.row)}
                               aria-label={`ติ๊กเลือก ${stripTag(m.name)}`}
                             />
                           </td>
@@ -778,11 +799,47 @@ export function RosterManagePanel() {
                 </button>
               </div>
 
+              {/* Nothing destructive here on purpose: OutDC is the archive, so
+                  the only thing worth doing with a handful of its rows is
+                  taking their ids somewhere else. */}
+              {out.members.length > 0 && (
+                <div className="bulk-bar">
+                  <span className="bulk-count">☑️ ติ๊กไว้ {out.members.length} คน</span>
+
+                  <button
+                    type="button"
+                    className="btn-secondary btn-sm"
+                    onClick={() => void copyIds(out.members)}
+                  >
+                    📋 ก๊อป ID Discord
+                  </button>
+
+                  <button type="button" className="btn-secondary btn-sm" onClick={out.clear}>
+                    ✖ ล้างการเลือก
+                  </button>
+                </div>
+              )}
+
               <div className="table-wrap">
                 {(reloading || visibleOutDC.length > 0) && (
                   <table>
                     <thead>
                       <tr>
+                        <th className="pick-col">
+                          <input
+                            type="checkbox"
+                            checked={out.allSelected}
+                            ref={(el) => {
+                              if (el) {
+                                el.indeterminate = out.members.length > 0 && !out.allSelected;
+                              }
+                            }}
+                            disabled={busy || visibleOutDC.length === 0}
+                            onChange={out.toggleAll}
+                            aria-label="ติ๊กทุกคนที่เห็นอยู่"
+                            title="ติ๊กทุกคนที่เห็นอยู่ (ตามการค้นหา)"
+                          />
+                        </th>
                         <th>#</th>
                         <th>รหัส</th>
                         <th>ชื่อ-นามสกุล</th>
@@ -796,7 +853,7 @@ export function RosterManagePanel() {
                     <tbody>
                       {reloading && (
                         <tr>
-                          <td colSpan={8} className="loading">
+                          <td colSpan={9} className="loading">
                             กำลังโหลด
                           </td>
                         </tr>
@@ -804,6 +861,15 @@ export function RosterManagePanel() {
                       {!reloading &&
                         visibleOutDC.map((m, i) => (
                         <tr key={`${m.row}-${m.code}`}>
+                          <td className="pick-col">
+                            <input
+                              type="checkbox"
+                              checked={out.isTicked(m.row)}
+                              disabled={busy}
+                              onChange={() => out.toggleRow(m.row)}
+                              aria-label={`ติ๊กเลือก ${stripTag(m.name)}`}
+                            />
+                          </td>
                           <td>{i + 1}</td>
                           <td>
                             <strong>{m.code}</strong>
